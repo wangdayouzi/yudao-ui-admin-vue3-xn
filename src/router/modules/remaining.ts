@@ -823,6 +823,29 @@ const remainingRouter: AppRouteRecordRaw[] = [
         ]
       }
     ]
+  },
+  {
+    path: '/amf',
+    component: Layout,
+    name: 'AmfRouter',
+    meta: {
+      hidden: true
+    },
+    children: [
+      {
+        path: 'editor',
+        component: () => import('@/views/amf/business/AmfOnlyOfficeEditor.vue'),
+        name: 'AmfOnlyOfficeEditor',
+        meta: {
+          noCache: true,
+          hidden: true,
+          canTo: true,
+          icon: 'ep:document',
+          title: '在线编辑分析方法文件',
+          activeMenu: '/amf/business'
+        }
+      }
+    ]
   }
 ]
 
