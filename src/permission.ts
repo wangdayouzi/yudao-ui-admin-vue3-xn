@@ -1,7 +1,7 @@
 import router from './router'
 import type { RouteRecordRaw } from 'vue-router'
 import { isRelogin } from '@/config/axios/service'
-import { getAccessToken } from '@/utils/auth'
+import { getAccessToken, setToken } from '@/utils/auth'
 import { useTitle } from '@/hooks/web/useTitle'
 import { useNProgress } from '@/hooks/web/useNProgress'
 import { usePageLoading } from '@/hooks/web/usePageLoading'
@@ -28,6 +28,23 @@ const whiteList = [
 router.beforeEach(async (to, from, next) => {
   start()
   loadStart()
+
+  // 钉钉OAuth回调携带token参数，提取并存储后清除URL参数
+  const tokenParam = to.query.token as string
+  if (tokenParam) {
+    setToken({
+      accessToken: tokenParam,
+      refreshToken: (to.query.refreshToken as string) || '',
+      userId: 0,
+      userType: 0,
+      clientId: '',
+      id: 0,
+      expiresTime: 0
+    })
+    next({ path: to.path, query: {}, replace: true })
+    return
+  }
+
   if (getAccessToken()) {
     if (to.path === '/login') {
       next({ path: '/' })

@@ -85,19 +85,14 @@
       <el-col :span="24" class="px-10px">
         <el-form-item>
           <el-row :gutter="5" justify="space-between" style="width: 100%">
-            <el-col :span="8">
+            <el-col :span="12">
               <el-button class="w-full" @click="setLoginState(LoginStateEnum.MOBILE)">
                 {{ t('login.btnMobile') }}
               </el-button>
             </el-col>
-            <el-col :span="8">
+            <el-col :span="12">
               <el-button class="w-full" @click="setLoginState(LoginStateEnum.QR_CODE)">
                 {{ t('login.btnQRCode') }}
-              </el-button>
-            </el-col>
-            <el-col :span="8">
-              <el-button class="w-full" @click="setLoginState(LoginStateEnum.REGISTER)">
-                {{ t('login.btnRegister') }}
               </el-button>
             </el-col>
           </el-row>
@@ -106,31 +101,11 @@
       <el-divider content-position="center">{{ t('login.otherLogin') }}</el-divider>
       <el-col :span="24" class="px-10px">
         <el-form-item>
-          <div class="w-full flex justify-between">
-            <Icon
-              v-for="(item, key) in socialList"
-              :key="key"
-              :icon="item.icon"
-              :size="30"
-              class="anticon cursor-pointer"
-              color="#999"
-              @click="doSocialLogin(item.type)"
-            />
-          </div>
-        </el-form-item>
-      </el-col>
-      <el-divider content-position="center">萌新必读</el-divider>
-      <el-col :span="24" class="px-10px">
-        <el-form-item>
-          <div class="w-full flex justify-between">
-            <el-link href="https://doc.iocoder.cn/" target="_blank">📚开发指南</el-link>
-            <el-link href="https://doc.iocoder.cn/video/" target="_blank">🔥视频教程</el-link>
-            <el-link href="https://www.iocoder.cn/Interview/good-collection/" target="_blank">
-              ⚡面试手册
-            </el-link>
-            <el-link href="http://static.yudao.iocoder.cn/mp/Aix9975.jpeg" target="_blank">
-              🤝外包咨询
-            </el-link>
+          <div class="w-full flex justify-center">
+            <el-button type="primary" size="large" class="dingtalk-btn" @click="doSocialLogin(20)">
+              <Icon :icon="'ant-design:dingtalk-circle-filled'" :size="20" color="#fff" class="mr-8px" />
+              钉钉账号登录
+            </el-button>
           </div>
         </el-form-item>
       </el-col>
@@ -179,19 +154,12 @@ const loginData = reactive({
   tenantEnable: import.meta.env.VITE_APP_TENANT_ENABLE,
   loginForm: {
     tenantName: import.meta.env.VITE_APP_DEFAULT_LOGIN_TENANT || '',
-    username: import.meta.env.VITE_APP_DEFAULT_LOGIN_USERNAME || '',
-    password: import.meta.env.VITE_APP_DEFAULT_LOGIN_PASSWORD || '',
+    username: '',
+    password: '',
     captchaVerification: '',
-    rememberMe: true // 默认记录我。如果不需要，可手动修改
+    rememberMe: true
   }
 })
-
-const socialList = [
-  { icon: 'ant-design:wechat-filled', type: 30 },
-  { icon: 'ant-design:dingtalk-circle-filled', type: 20 },
-  { icon: 'ant-design:github-filled', type: 0 },
-  { icon: 'ant-design:alipay-circle-filled', type: 0 }
-]
 
 // 获取验证码
 const getCode = async () => {
@@ -281,9 +249,31 @@ const handleLogin = async (params: any) => {
 const doSocialLogin = async (type: number) => {
   if (type === 0) {
     message.error('此方式未配置')
-  } else {
-    loginLoading.value = true
-    if (loginData.tenantEnable === 'true') {
+    return
+  }
+  loginLoading.value = true
+
+  // 钉钉走新版 OAuth2（login.dingtalk.com，支持账号密码）
+  if (type === 20) {
+    try {
+      const url = await LoginApi.dingtalkOAuth2AuthorizeUrl()
+      console.log('[DingTalk] authorize-url:', url)
+      if (url) {
+        window.location.href = url
+      } else {
+        message.error('获取钉钉授权地址为空')
+      }
+    } catch (e) {
+      console.error('[DingTalk] authorize-url 请求失败:', e)
+      message.error('钉钉登录配置异常，请联系管理员')
+    } finally {
+      loginLoading.value = false
+    }
+    return
+  }
+
+  // 其他平台走 JustAuth 原逻辑
+  if (loginData.tenantEnable === 'true') {
       // 尝试先通过 tenantName 获取租户
       await getTenantId()
       // 如果获取不到，则需要弹出提示，进行处理
@@ -310,7 +300,6 @@ const doSocialLogin = async (type: number) => {
 
     // 进行跳转
     window.location.href = await LoginApi.socialAuthRedirect(type, encodeURIComponent(redirectUri))
-  }
 }
 watch(
   () => currentRoute.value,
@@ -328,9 +317,16 @@ onMounted(() => {
 </script>
 
 <style lang="scss" scoped>
-:deep(.anticon) {
+.dingtalk-btn {
+  background: #1677ff;
+  border-color: #1677ff;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   &:hover {
-    color: var(--el-color-primary) !important;
+    background: #4096ff;
+    border-color: #4096ff;
   }
 }
 

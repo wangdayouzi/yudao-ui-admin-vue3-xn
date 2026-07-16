@@ -4,10 +4,13 @@ import request from '@/config/axios'
 
 export interface AmfBusinessVO {
   id?: number
-  basNo: string
-  protocolNo?: string
-  sponsor?: string
-  analysisMethod?: string
+  methodNo: string
+  methodVersion?: string
+  methodName?: string
+  testArticle?: string
+  matrixType?: string
+  sd?: string
+  effectiveDate?: string
   fileName?: string
   fileUrl?: string
   fileVersion?: number
@@ -85,9 +88,13 @@ export const deleteFile = (fileId: number) => {
 // ==================== 文件上传 API ====================
 
 // 上传文件（新版本）
-export const uploadFile = (businessId: number, file: File, changeDescription?: string): Promise<AmfFileVersionVO> => {
+// fileId 可选：指定时为该文件记录追加版本（不按文件名匹配）；不指定时按文件名匹配已有文件
+export const uploadFile = (businessId: number, file: File, changeDescription?: string, fileId?: number): Promise<AmfFileVersionVO> => {
   const formData = new FormData()
   formData.append('businessId', String(businessId))
+  if (fileId) {
+    formData.append('fileId', String(fileId))
+  }
   formData.append('file', file)
   if (changeDescription) {
     formData.append('changeDescription', changeDescription)

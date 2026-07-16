@@ -1,20 +1,12 @@
 <template>
   <div class="onlyoffice-editor-page">
-    <!-- 顶部工具栏 -->
     <div class="editor-toolbar">
-      <el-button @click="goBack">
-        <Icon icon="ep:arrow-left" class="mr-4px" />
-        返回
-      </el-button>
-      <span class="editor-title">
-        {{ fileName }} - v{{ versionNo }}
-      </span>
+      <el-button @click="goBack"><Icon icon="ep:arrow-left" class="mr-4px" />返回</el-button>
+      <span class="editor-title">{{ fileName }} - v{{ versionNo }}</span>
       <el-tag v-if="loading" type="warning" size="small">正在加载编辑器...</el-tag>
       <el-tag v-else-if="errorMsg" type="danger" size="small">加载失败</el-tag>
       <el-tag v-else type="success" size="small">编辑器已就绪</el-tag>
     </div>
-
-    <!-- 编辑器容器 -->
     <div v-if="errorMsg" class="error-container">
       <el-result icon="error" title="编辑器加载失败" :sub-title="errorMsg">
         <template #extra>
@@ -23,134 +15,88 @@
         </template>
       </el-result>
     </div>
-
     <div v-else class="editor-container">
-      <!-- OnlyOffice 占位 -->
-      <div
-        v-if="loading || !editorConfig"
-        class="editor-loading"
-        v-loading="loading"
-      >
-        <span v-if="loading">正在初始化 OnlyOffice 编辑器...</span>
+      <div v-show="loading" class="editor-loading" v-loading="loading">
+        <span>正在初始化 OnlyOffice 编辑器...</span>
       </div>
-      <!-- OnlyOffice 编辑器 iframe -->
-      <iframe
-        v-if="editorConfig && iframeUrl"
-        :src="iframeUrl"
-        class="editor-iframe"
-        frameborder="0"
-        @load="onEditorLoad"
-      />
+      <div id="editor-placeholder" class="editor-placeholder" />
     </div>
   </div>
 </template>
 
 <script lang="ts" setup>
 import { useRoute, useRouter } from 'vue-router'
+import { useTagsView } from '@/hooks/web/useTagsView'
 import * as AmfApi from '@/api/amf/index'
 
 defineOptions({ name: 'AmfOnlyOfficeEditor' })
 
 const route = useRoute()
 const router = useRouter()
+const { setTitle } = useTagsView()
 
 const loading = ref(true)
 const errorMsg = ref('')
 const editorConfig = ref<any>(null)
-const fileName = ref('')
+const fileName = ref('未知文件')
 const versionNo = ref(0)
+let docEditor: any = null
 
-/** OnlyOffice iframe URL */
-const iframeUrl = computed(() => {
-  if (!editorConfig.value) return ''
-  // 根据编辑器配置构建 iframe URL
-  // 这里需要根据实际的 OnlyOffice Document Server 地址来构建
-  const docServerUrl = editorConfig.value.docServerUrl || 'http://localhost:8088'
-  // 将配置转为查询参数
-  const configStr = encodeURIComponent(JSON.stringify(editorConfig.value))
-  return `${docServerUrl}/web-apps/apps/api/documents/api.js?config=${configStr}`
-})
-
-/** 加载编辑器 */
 const loadEditor = async () => {
-  loading.value = true
-  errorMsg.value = ''
-
+  loading.value = true; errorMsg.value = ''
   try {
     const versionId = Number(route.query.versionId)
+    if (!versionId) { errorMsg.value = '缺少版本ID参数'; return }
     const config = await AmfApi.getEditorConfig(versionId)
-
-    if (!config || !config.document) {
-      errorMsg.value = '获取编辑器配置失败'
-      return
-    }
-
+    if (!config || !config.document) { errorMsg.value = '获取编辑器配置失败'; return }
     editorConfig.value = config
     fileName.value = config.document?.title || '未知文件'
     versionNo.value = config.document?.key?.split('_v')[1] || 0
-
-    // 动态加载 OnlyOffice API
+    setTitle(`${fileName.value} - v${versionNo.value}`, route.fullPath)
+    await nextTick()
     await loadOnlyOfficeScript(config)
   } catch (e: any) {
     console.error('加载编辑器失败:', e)
     errorMsg.value = e.message || '加载编辑器失败，请检查 OnlyOffice 服务是否启动'
-  } finally {
-    loading.value = false
-  }
+  } finally { loading.value = false }
 }
 
-/** 动态加载 OnlyOffice JS API */
 const loadOnlyOfficeScript = (config: any): Promise<void> => {
   return new Promise((resolve, reject) => {
     const scriptId = 'onlyoffice-api-script'
-    // 移除旧脚本
     const oldScript = document.getElementById(scriptId)
-    if (oldScript) {
-      oldScript.remove()
-    }
-
+    if (oldScript) oldScript.remove()
+    if (docEditor) { docEditor.destroyEditor(); docEditor = null }
     const script = document.createElement('script')
     script.id = scriptId
-    const docServerUrl = config.docServerUrl || 'http://localhost:8088'
-    script.src = `${docServerUrl}/web-apps/apps/api/documents/api.js`
+    script.src = `${config.docServerUrl || 'http://localhost:8088'}/web-apps/apps/api/documents/api.js`
     script.onload = () => {
-      // 初始化 OnlyOffice 编辑器
       try {
-        const docEditor = new (window as any).DocsAPI.DocEditor('editor-placeholder', {
+        docEditor = new (window as any).DocsAPI.DocEditor('editor-placeholder', {
           ...config,
-          width: '100%',
-          height: '100%'
+          events: { onRequestClose: () => router.back() }
         })
         resolve()
-      } catch (e) {
-        reject(e)
-      }
+      } catch (e) { reject(e) }
     }
-    script.onerror = () => reject(new Error('OnlyOffice API 脚本加载失败'))
+    script.onerror = () => reject(new Error('OnlyOffice API 脚本加载失败，请确认 Document Server 已启动'))
     document.head.appendChild(script)
   })
 }
 
-/** 编辑器加载完成 */
-const onEditorLoad = () => {
-  // iframe 模式下，编辑器在 iframe 内自动初始化
-}
-
-/** 返回列表 */
-const goBack = () => {
-  router.back()
-}
-
-onMounted(() => {
-  loadEditor()
-})
+const goBack = () => { destroyEditor(); router.back() }
+const destroyEditor = () => { if (docEditor) { try { docEditor.destroyEditor() } catch (e) {}; docEditor = null } }
+onBeforeUnmount(() => { destroyEditor(); document.title = '芋道快速开发平台' })
+onDeactivated(() => { destroyEditor(); document.title = '芋道快速开发平台' })
+onMounted(() => loadEditor())
 </script>
 
 <style lang="scss" scoped>
 .onlyoffice-editor-page {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  height: calc(100vh - 84px);
+  overflow: hidden;
   background: #f0f2f5;
 
   .editor-toolbar {
@@ -192,10 +138,9 @@ onMounted(() => {
       color: #909399;
     }
 
-    .editor-iframe {
+    .editor-placeholder {
       width: 100%;
       height: 100%;
-      border: none;
     }
   }
 }

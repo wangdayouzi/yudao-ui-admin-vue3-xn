@@ -841,7 +841,7 @@ const remainingRouter: AppRouteRecordRaw[] = [
           hidden: true,
           canTo: true,
           icon: 'ep:document',
-          title: '在线编辑分析方法文件',
+          title: '预览分析方法文件',
           activeMenu: '/amf/business'
         }
       }

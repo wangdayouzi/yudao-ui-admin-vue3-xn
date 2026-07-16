@@ -7,8 +7,8 @@
       :rules="formRules"
       label-width="100px"
     >
-      <el-form-item label="业务编号">
-        <el-tag>{{ currentBusiness?.basNo || '-' }}</el-tag>
+      <el-form-item label="方法编号">
+        <el-tag>{{ currentBusiness?.methodNo || '-' }}</el-tag>
       </el-form-item>
       <el-form-item label="当前版本">
         <el-tag v-if="currentBusiness?.fileVersion" type="success">

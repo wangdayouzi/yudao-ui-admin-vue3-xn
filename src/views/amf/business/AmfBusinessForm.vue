@@ -7,21 +7,30 @@
       :rules="formRules"
       label-width="120px"
     >
-      <el-form-item label="BAS编号" prop="basNo">
-        <el-input v-model="formData.basNo" placeholder="请输入BAS编号" />
+      <el-form-item label="方法编号" prop="methodNo">
+        <el-input v-model="formData.methodNo" placeholder="请输入方法编号" />
       </el-form-item>
-      <el-form-item label="临床方案编号">
-        <el-input v-model="formData.protocolNo" placeholder="请输入临床方案编号" />
+      <el-form-item label="版本号">
+        <el-input v-model="formData.methodVersion" placeholder="请输入版本号" />
       </el-form-item>
-      <el-form-item label="申办方">
-        <el-input v-model="formData.sponsor" placeholder="请输入申办方" />
+      <el-form-item label="方法名称">
+        <el-input v-model="formData.methodName" placeholder="请输入方法名称" />
       </el-form-item>
-      <el-form-item label="分析方法">
-        <el-input
-          v-model="formData.analysisMethod"
-          type="textarea"
-          :rows="3"
-          placeholder="请输入分析方法"
+      <el-form-item label="测试物">
+        <el-input v-model="formData.testArticle" placeholder="请输入测试物" />
+      </el-form-item>
+      <el-form-item label="基质类型">
+        <el-input v-model="formData.matrixType" placeholder="请输入基质类型" />
+      </el-form-item>
+      <el-form-item label="SD">
+        <UserSelectV2 v-model="formData.sd" placeholder="请选择SD" />
+      </el-form-item>
+      <el-form-item label="签字生效日期">
+        <el-date-picker
+          v-model="formData.effectiveDate"
+          type="date"
+          placeholder="请选择签字生效日期"
+          value-format="YYYY-MM-DD"
         />
       </el-form-item>
       <!-- 新增时可上传文件 -->
@@ -63,6 +72,7 @@
 
 <script lang="ts" setup>
 import * as AmfApi from '@/api/amf/index'
+import UserSelectV2 from '@/views/system/user/components/UserSelectV2.vue'
 import type { UploadInstance, UploadProps, UploadRawFile } from 'element-plus'
 import { CommonStatusEnum } from '@/utils/constants'
 
@@ -80,15 +90,18 @@ const selectedFile = ref<File>()
 
 const formData = ref({
   id: undefined as number | undefined,
-  basNo: '',
-  protocolNo: '',
-  sponsor: '',
-  analysisMethod: '',
+  methodNo: '',
+  methodVersion: '',
+  methodName: '',
+  testArticle: '',
+  matrixType: '',
+  sd: '',
+  effectiveDate: '',
   changeDescription: ''
 })
 
 const formRules = reactive({
-  basNo: [{ required: true, message: 'BAS编号不能为空', trigger: 'blur' }]
+  methodNo: [{ required: true, message: '方法编号不能为空', trigger: 'blur' }]
 })
 
 const formRef = ref()
@@ -123,7 +136,7 @@ const open = async (type: string, id?: number) => {
     formLoading.value = true
     try {
       const data = await AmfApi.getBusiness(id)
-      formData.value = { id: data.id, basNo: data.basNo, protocolNo: data.protocolNo || '', sponsor: data.sponsor || '', analysisMethod: data.analysisMethod || '', changeDescription: '' }
+      formData.value = { id: data.id, methodNo: data.methodNo, methodVersion: data.methodVersion || '', methodName: data.methodName || '', testArticle: data.testArticle || '', matrixType: data.matrixType || '', sd: data.sd || '', effectiveDate: data.effectiveDate || '', changeDescription: '' }
     } finally { formLoading.value = false }
   }
 }
@@ -143,7 +156,7 @@ const submitForm = async () => {
       }
       message.success(t('common.createSuccess'))
     } else {
-      await AmfApi.updateBusiness({ id: formData.value.id, basNo: formData.value.basNo, protocolNo: formData.value.protocolNo, sponsor: formData.value.sponsor, analysisMethod: formData.value.analysisMethod, status: CommonStatusEnum.ENABLE } as any)
+      await AmfApi.updateBusiness({ id: formData.value.id, methodNo: formData.value.methodNo, methodVersion: formData.value.methodVersion, methodName: formData.value.methodName, testArticle: formData.value.testArticle, matrixType: formData.value.matrixType, sd: formData.value.sd, effectiveDate: formData.value.effectiveDate, status: CommonStatusEnum.ENABLE } as any)
       message.success(t('common.updateSuccess'))
     }
     dialogVisible.value = false
@@ -152,7 +165,7 @@ const submitForm = async () => {
 }
 
 const resetForm = () => {
-  formData.value = { id: undefined, basNo: '', protocolNo: '', sponsor: '', analysisMethod: '', changeDescription: '' }
+  formData.value = { id: undefined, methodNo: '', methodVersion: '', methodName: '', testArticle: '', matrixType: '', sd: '', effectiveDate: '', changeDescription: '' }
   selectedFile.value = undefined
   uploadRef.value?.clearFiles()
 }

@@ -1,5 +1,5 @@
 <template>
-  <el-drawer v-model="visible" :title="'文件管理 - ' + business?.basNo" size="850px" direction="rtl">
+  <el-drawer v-model="visible" :title="'文件管理 - ' + business?.methodNo" size="850px" direction="rtl">
     <div class="upload-area mb-16px p-12px bg-gray-50 rounded">
       <el-upload
         ref="uploadRef"

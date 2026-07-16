@@ -1,10 +1,10 @@
 <template>
-  <Dialog v-model="dialogVisible" :title="'版本管理 - ' + (currentBusiness?.basNo || '')" width="1000px">
+  <Dialog v-model="dialogVisible" :title="'版本管理 - ' + (currentBusiness?.methodNo || '')" width="1000px">
     <!-- 基本信息 -->
     <el-descriptions :column="3" border class="mb-20px">
-      <el-descriptions-item label="BAS编号">{{ currentBusiness?.basNo }}</el-descriptions-item>
-      <el-descriptions-item label="临床方案编号">{{ currentBusiness?.protocolNo || '-' }}</el-descriptions-item>
-      <el-descriptions-item label="申办方">{{ currentBusiness?.sponsor || '-' }}</el-descriptions-item>
+      <el-descriptions-item label="方法编号">{{ currentBusiness?.methodNo }}</el-descriptions-item>
+      <el-descriptions-item label="版本号">{{ currentBusiness?.methodVersion || '-' }}</el-descriptions-item>
+      <el-descriptions-item label="方法名称">{{ currentBusiness?.methodName || '-' }}</el-descriptions-item>
     </el-descriptions>
 
     <!-- 文件列表 -->
