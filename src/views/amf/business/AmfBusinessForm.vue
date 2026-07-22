@@ -45,6 +45,7 @@
                   :on-exceed="() => message.error('只能选一个')"
                   :show-file-list="false"
                   accept=".doc,.docx,.xls,.xlsx,.ppt,.pptx,.pdf,.txt,.odt,.ods,.odp,.csv,.rtf"
+                  class="!w-full"
                 >
                   <el-button size="small" class="file-name-btn">{{ row.file ? row.file.name : '点击选取文件' }}</el-button>
                 </el-upload>
@@ -118,7 +119,7 @@ const formData = ref({
   methodName: '',
   testArticle: '',
   matrixType: '',
-  sd: '',
+  sd: undefined,
   effectiveDate: '',
   changeDescription: ''
 })
@@ -148,7 +149,7 @@ const open = async (type: string, id?: number) => {
     formLoading.value = true
     try {
       const data = await AmfApi.getBusiness(id)
-      formData.value = { id: data.id, methodNo: data.methodNo, methodVersion: data.methodVersion || '', methodName: data.methodName || '', testArticle: data.testArticle || '', matrixType: data.matrixType || '', sd: data.sd || '', effectiveDate: data.effectiveDate || '', changeDescription: '' }
+      formData.value = { id: data.id, methodNo: data.methodNo, methodVersion: data.methodVersion || '', methodName: data.methodName || '', testArticle: data.testArticle || '', matrixType: data.matrixType || '', sd: data.sd || undefined, effectiveDate: data.effectiveDate || '', changeDescription: '' }
     } finally { formLoading.value = false }
   }
 }
@@ -180,7 +181,7 @@ const submitForm = async () => {
 }
 
 const resetForm = () => {
-  formData.value = { id: undefined, methodNo: '', methodVersion: '', methodName: '', testArticle: '', matrixType: '', sd: '', effectiveDate: '', changeDescription: '' }
+  formData.value = { id: undefined, methodNo: '', methodVersion: '', methodName: '', testArticle: '', matrixType: '', sd: undefined, effectiveDate: '', changeDescription: '' }
   fileEntries.value = [{ file: undefined, versionNo: '', effectiveDate: '' }]
   uploadRefs.value = []
 }
@@ -188,7 +189,7 @@ const resetForm = () => {
 
 <style lang="scss" scoped>
 .file-name-btn {
-  max-width: 200px;
+  max-width: 180px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
