@@ -10,9 +10,6 @@
       <el-form-item label="方法编号" prop="methodNo">
         <el-input v-model="formData.methodNo" placeholder="请输入方法编号" />
       </el-form-item>
-      <el-form-item label="版本号">
-        <el-input v-model="formData.methodVersion" placeholder="请输入版本号" />
-      </el-form-item>
       <el-form-item label="方法名称">
         <el-input v-model="formData.methodName" placeholder="请输入方法名称" />
       </el-form-item>
@@ -25,7 +22,7 @@
       <el-form-item label="SD">
         <UserSelectV2 v-model="formData.sd" placeholder="请选择SD" />
       </el-form-item>
-      <el-form-item label="签字生效日期">
+      <el-form-item v-if="formType === 'update'" label="签字生效日期">
         <el-date-picker
           v-model="formData.effectiveDate"
           type="date"
@@ -35,32 +32,51 @@
       </el-form-item>
       <!-- 新增时可上传文件 -->
       <el-form-item v-if="formType === 'create'" label="上传文件">
-        <el-upload
-          ref="uploadRef"
-          :auto-upload="false"
-          :limit="1"
-          :on-change="handleFileChange"
-          :on-remove="handleFileRemove"
-          :on-exceed="handleExceed"
-          drag
-          accept=".doc,.docx,.xls,.xlsx,.ppt,.pptx,.pdf,.txt,.odt,.ods,.odp,.csv,.rtf"
-        >
-          <Icon icon="ep:upload-filled" class="text-40px text-gray-400" />
-          <div class="mt-10px text-gray-500">将文件拖到此处，或<em>点击选取</em></div>
-          <template #tip>
-            <div class="text-12px text-gray-400 mt-6px">
-              支持 doc/docx/xls/xlsx/ppt/pptx/pdf/txt 等格式，最大 50MB
-            </div>
-          </template>
-        </el-upload>
-      </el-form-item>
-      <el-form-item v-if="formType === 'create'" label="变更说明">
-        <el-input
-          v-model="formData.changeDescription"
-          type="textarea"
-          :rows="2"
-          placeholder="请简要描述本次上传内容"
-        />
+        <div class="w-full">
+          <el-table :data="fileEntries" size="small" border>
+            <el-table-column min-width="200">
+              <template #header><span class="required-label">选择文件</span></template>
+              <template #default="{ row, $index }">
+                <el-upload
+                  :ref="el => setUploadRef(el, $index)"
+                  :auto-upload="false"
+                  :limit="1"
+                  :on-change="(f: any) => handleFileEntryChange(f, $index)"
+                  :on-exceed="() => message.error('只能选一个')"
+                  :show-file-list="false"
+                  accept=".doc,.docx,.xls,.xlsx,.ppt,.pptx,.pdf,.txt,.odt,.ods,.odp,.csv,.rtf"
+                >
+                  <el-button size="small" class="file-name-btn">{{ row.file ? row.file.name : '点击选取文件' }}</el-button>
+                </el-upload>
+              </template>
+            </el-table-column>
+            <el-table-column width="140">
+              <template #header><span class="required-label">版本号</span></template>
+              <template #default="{ row }">
+                <el-input v-model="row.versionNo" size="small" placeholder="如 V1.0" />
+              </template>
+            </el-table-column>
+            <el-table-column width="170">
+              <template #header><span class="required-label">签字生效日期</span></template>
+              <template #default="{ row }">
+                <el-date-picker
+                  v-model="row.effectiveDate"
+                  type="date"
+                  placeholder="请选择"
+                  value-format="YYYY-MM-DD"
+                  size="small"
+                  class="!w-full"
+                />
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="60" align="center">
+              <template #default="{ $index }">
+                <el-button v-if="fileEntries.length > 1" link size="small" type="danger" @click="fileEntries.splice($index, 1)">删除</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+          <el-button class="mt-8px" size="small" type="primary" plain @click="fileEntries.push({ file: undefined, versionNo: '', effectiveDate: '' })">+ 添加文件</el-button>
+        </div>
       </el-form-item>
     </el-form>
     <template #footer>
@@ -73,7 +89,7 @@
 <script lang="ts" setup>
 import * as AmfApi from '@/api/amf/index'
 import UserSelectV2 from '@/views/system/user/components/UserSelectV2.vue'
-import type { UploadInstance, UploadProps, UploadRawFile } from 'element-plus'
+import type { UploadRawFile } from 'element-plus'
 import { CommonStatusEnum } from '@/utils/constants'
 
 defineOptions({ name: 'AmfBusinessForm' })
@@ -85,8 +101,15 @@ const dialogVisible = ref(false)
 const dialogTitle = ref('')
 const formLoading = ref(false)
 const formType = ref('')
-const uploadRef = ref<UploadInstance>()
-const selectedFile = ref<File>()
+const uploadRefs = ref<any[]>([])
+const setUploadRef = (el: any, index: number) => { if (el) uploadRefs.value[index] = el }
+
+interface FileEntry {
+  file?: File
+  versionNo: string
+  effectiveDate: string
+}
+const fileEntries = ref<FileEntry[]>([{ file: undefined, versionNo: '', effectiveDate: '' }])
 
 const formData = ref({
   id: undefined as number | undefined,
@@ -106,26 +129,15 @@ const formRules = reactive({
 
 const formRef = ref()
 
-const handleFileChange: UploadProps['onChange'] = (uploadFile) => {
+const handleFileEntryChange = (uploadFile: any, index: number) => {
   const file = uploadFile.raw as UploadRawFile
   const maxSize = 50 * 1024 * 1024
   const allowedExts = ['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'pdf', 'txt', 'odt', 'ods', 'odp', 'csv', 'rtf']
   const ext = file.name.substring(file.name.lastIndexOf('.') + 1).toLowerCase()
-  if (!allowedExts.includes(ext)) {
-    message.error(`不支持的文件格式: .${ext}`)
-    uploadRef.value?.clearFiles()
-    return
-  }
-  if (file.size > maxSize) {
-    message.error('文件大小不能超过 50MB')
-    uploadRef.value?.clearFiles()
-    return
-  }
-  selectedFile.value = file
+  if (!allowedExts.includes(ext)) { message.error(`不支持的文件格式: .${ext}`); return }
+  if (file.size > maxSize) { message.error('文件大小不能超过 50MB'); return }
+  fileEntries.value[index].file = file
 }
-
-const handleFileRemove = () => { selectedFile.value = undefined }
-const handleExceed: UploadProps['onExceed'] = () => { message.error('只能上传一个文件') }
 
 const open = async (type: string, id?: number) => {
   dialogVisible.value = true
@@ -151,8 +163,11 @@ const submitForm = async () => {
   try {
     if (formType.value === 'create') {
       const businessId = await AmfApi.createBusiness({ ...formData.value, status: CommonStatusEnum.ENABLE } as any)
-      if (selectedFile.value) {
-        await AmfApi.uploadFile(businessId, selectedFile.value, formData.value.changeDescription)
+      // 上传所有文件
+      const entries = fileEntries.value.filter(e => e.file)
+      for (const entry of entries) {
+        if (!entry.versionNo || !entry.versionNo.trim()) { message.warning('请输入版本号'); formLoading.value = false; return }
+        await AmfApi.uploadFile(businessId, entry.file!, undefined, undefined, entry.versionNo, entry.effectiveDate)
       }
       message.success(t('common.createSuccess'))
     } else {
@@ -166,7 +181,21 @@ const submitForm = async () => {
 
 const resetForm = () => {
   formData.value = { id: undefined, methodNo: '', methodVersion: '', methodName: '', testArticle: '', matrixType: '', sd: '', effectiveDate: '', changeDescription: '' }
-  selectedFile.value = undefined
-  uploadRef.value?.clearFiles()
+  fileEntries.value = [{ file: undefined, versionNo: '', effectiveDate: '' }]
+  uploadRefs.value = []
 }
 </script>
+
+<style lang="scss" scoped>
+.file-name-btn {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.required-label::before {
+  content: '*';
+  color: #f56c6c;
+  margin-right: 4px;
+}
+</style>

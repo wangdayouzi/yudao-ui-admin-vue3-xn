@@ -30,15 +30,15 @@
             <div v-loading="row._fileLoading" class="file-expand p-8px bg-gray-50">
               <div class="flex items-center gap-8px mb-8px">
                 <span class="text-13px font-500 text-gray-700">文件列表</span>
-                <el-button size="small" type="primary" @click="openUpload(row)">上传文件</el-button>
+                <el-button size="small" type="primary" @click="openUpload(row)">上传新文件</el-button>
               </div>
               <el-table v-if="row._files?.length" :data="row._files" size="small" row-key="id" @expand-change="onFileExpand" border >
                 <el-table-column type="expand">
                   <template #default="{ row: f }">
                     <div v-loading="f._verLoading" class="p-4px pl-12px bg-blue-50 rounded">
                       <el-table :data="f._versions" size="small" class="ver-table" border >
-                        <el-table-column label="版本" width="60" align="center">
-                          <template #default="{ row: v }"><el-tag size="small" :type="v.versionNo === f.fileVersion ? 'success' : undefined">v{{ v.versionNo }}</el-tag></template>
+                        <el-table-column label="版本" width="120" align="center">
+                          <template #default="{ row: v }"><el-tag size="small" :type="v.versionNo === f.fileVersion ? 'success' : undefined">{{ v.versionNo }}</el-tag></template>
                         </el-table-column>
                         <el-table-column label="大小" width="80" align="center">
                           <template #default="{ row: v }">{{ formatSize(v.fileSize) }}</template>
@@ -51,7 +51,7 @@
                           <template #default="{ row: v }">
                             <el-button link size="small" type="primary" @click="previewVersion(v)">预览</el-button>
                             <el-button link size="small" type="success" @click="downloadVersion(v)">下载</el-button>
-                            <el-button link size="small" type="danger" @click="deleteVersion(row, row._files!, f, v)">删除</el-button>
+                            <el-button link size="small" type="danger" @click="deleteVersion(row, f, v)">删除</el-button>
                           </template>
                         </el-table-column>
                       </el-table>
@@ -59,15 +59,16 @@
                   </template>
                 </el-table-column>
                 <el-table-column label="文件名" prop="fileName" show-overflow-tooltip min-width="160" />
-                <el-table-column label="版本" width="70" align="center">
-                  <template #default="{ row: f }"><el-tag v-if="f.fileVersion" size="small" type="success">v{{ f.fileVersion }}</el-tag></template>
+                <el-table-column label="最新版本" width="120" align="center">
+                  <template #default="{ row: f }"><el-tag v-if="f.fileVersion" size="small" type="success">{{ f.fileVersion }}</el-tag></template>
                 </el-table-column>
-                <el-table-column label="操作" width="340" align="center">
+                <el-table-column :formatter="dateFormatter2" label="签字生效日期" prop="effectiveDate" width="120" align="center" />
+                <el-table-column :formatter="dateFormatter" label="上传时间" prop="createTime" width="150" align="center" />
+                <el-table-column label="操作" width="260" align="center">
                   <template #default="{ row: f }">
                     <el-button link size="small" type="primary" @click="uploadNewFileVersion(row, f)">上传新版本</el-button>
                     <el-button link size="small" type="warning" @click="previewFile(row, f)">预览</el-button>
                     <el-button link size="small" type="success" @click="downloadFile(f)">下载</el-button>
-                    <el-button link size="small" type="danger" @click="deleteFileRow(row, f)">删除</el-button>
                   </template>
                 </el-table-column>
               </el-table>
@@ -77,7 +78,6 @@
         </el-table-column>
         <el-table-column align="center" label="编号" prop="id" width="80" />
         <el-table-column align="center" label="方法编号" prop="methodNo" show-overflow-tooltip />
-        <el-table-column align="center" label="版本号" prop="methodVersion" show-overflow-tooltip />
         <el-table-column align="center" label="方法名称" prop="methodName" show-overflow-tooltip min-width="130" />
         <el-table-column align="center" label="测试物" prop="testArticle" show-overflow-tooltip />
         <el-table-column align="center" label="基质类型" prop="matrixType" show-overflow-tooltip />
@@ -97,18 +97,66 @@
 
     <AmfBusinessForm ref="formRef" @success="getList" />
 
-    <el-dialog v-model="uploadVisible" :title="uploadTargetFile ? '上传新版本' : '上传文件'" width="450px" :close-on-click-modal="false">
-      <el-form :model="uploadForm" label-width="80px">
-        <el-form-item label="选择文件" required>
-          <el-upload ref="uploadElRef" :auto-upload="false" :limit="1" :on-change="onUploadFileChange" :on-exceed="() => message.error('只能选择一个文件')" drag accept=".doc,.docx,.xls,.xlsx,.ppt,.pptx,.pdf,.txt,.odt,.ods,.odp,.csv,.rtf">
-            <Icon icon="ep:upload-filled" class="text-32px text-gray-400" />
-            <div class="mt-6px text-gray-500 text-13px">拖拽或点击选取（最大50MB）</div>
-          </el-upload>
-        </el-form-item>
-        <el-form-item label="变更说明">
-          <el-input v-model="uploadForm.desc" type="textarea" :rows="2" placeholder="可选" />
-        </el-form-item>
-      </el-form>
+    <el-dialog v-model="uploadVisible" :title="uploadTargetFile ? '上传新版本' : '上传新文件'" :width="uploadTargetFile ? '560px' : '750px'" :close-on-click-modal="false">
+      <!-- 新版本：单文件 -->
+      <template v-if="uploadTargetFile">
+        <el-form :model="uploadForm" label-width="110px">
+          <el-form-item label="选择文件" required>
+            <el-upload ref="uploadElRef" :auto-upload="false" :limit="1" :on-change="onUploadFileChange" :on-exceed="onUploadExceed" drag accept=".doc,.docx,.xls,.xlsx,.ppt,.pptx,.pdf,.txt,.odt,.ods,.odp,.csv,.rtf" class="upload-dragger--compact">
+              <Icon icon="ep:upload-filled" class="text-30px text-gray-400" />
+              <div class="mt-4px text-gray-500 text-12px">拖拽或点击选取（最大50MB）</div>
+            </el-upload>
+          </el-form-item>
+          <el-form-item label="版本号" required>
+            <el-input v-model="uploadForm.versionNo" placeholder="请输入版本号（如 V2.0）" class="!w-full" />
+          </el-form-item>
+          <el-form-item label="签字生效日期" required>
+            <el-date-picker v-model="uploadForm.effectiveDate" type="date" value-format="YYYY-MM-DD" placeholder="请选择签字生效日期" class="!w-full" />
+          </el-form-item>
+          <el-form-item label="变更说明">
+            <el-input v-model="uploadForm.desc" type="textarea" :rows="2" placeholder="可选" />
+          </el-form-item>
+        </el-form>
+      </template>
+      <!-- 新文件：多文件表格 -->
+      <template v-else>
+        <el-table :data="uploadFileEntries" size="small" border>
+          <el-table-column min-width="200">
+            <template #header><span class="required-label">选择文件</span></template>
+            <template #default="{ row, $index }">
+              <el-upload
+                :ref="el => setUploadEntryRef(el, $index)"
+                :auto-upload="false"
+                :limit="1"
+                :on-change="(f: any) => handleUploadEntryFile(f, $index)"
+                :on-exceed="() => message.error('只能选一个')"
+                :show-file-list="false"
+                accept=".doc,.docx,.xls,.xlsx,.ppt,.pptx,.pdf,.txt,.odt,.ods,.odp,.csv,.rtf"
+              >
+                <el-button size="small" class="file-name-btn">{{ row.file ? row.file.name : '点击选取文件' }}</el-button>
+              </el-upload>
+            </template>
+          </el-table-column>
+          <el-table-column width="140">
+            <template #header><span class="required-label">版本号</span></template>
+            <template #default="{ row }">
+              <el-input v-model="row.versionNo" size="small" placeholder="如 V1.0" />
+            </template>
+          </el-table-column>
+          <el-table-column width="170">
+            <template #header><span class="required-label">签字生效日期</span></template>
+            <template #default="{ row }">
+              <el-date-picker v-model="row.effectiveDate" type="date" value-format="YYYY-MM-DD" placeholder="请选择" size="small" class="!w-full" />
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="60" align="center">
+            <template #default="{ $index }">
+              <el-button v-if="uploadFileEntries.length > 1" link size="small" type="danger" @click="uploadFileEntries.splice($index, 1)">删除</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+        <el-button class="mt-8px" size="small" type="primary" plain @click="uploadFileEntries.push({ file: undefined, versionNo: '', effectiveDate: '' })">+ 添加文件</el-button>
+      </template>
       <template #footer>
         <el-button :disabled="uploadLoading" type="primary" @click="doUploadFile">确定上传</el-button>
         <el-button @click="uploadVisible = false">取消</el-button>
@@ -144,7 +192,13 @@ const uploadLoading = ref(false)
 const uploadTargetBusiness = ref<AmfApi.AmfBusinessVO | null>(null)
 const uploadTargetFile = ref<AmfApi.AmfFileVO | null>(null)
 const uploadElRef = ref()
-const uploadForm = reactive({ desc: '', file: undefined as File | undefined })
+const uploadEntryRefs = ref<any[]>([])
+const setUploadEntryRef = (el: any, index: number) => { if (el) uploadEntryRefs.value[index] = el }
+
+interface UploadFileEntry { file?: File; versionNo: string; effectiveDate: string }
+const uploadFileEntries = ref<UploadFileEntry[]>([{ file: undefined, versionNo: '', effectiveDate: '' }])
+
+const uploadForm = reactive({ desc: '', file: undefined as File | undefined, versionNo: '', effectiveDate: '' })
 
 const getList = async () => {
   loading.value = true
@@ -179,13 +233,15 @@ const onFileExpand = async (fileRow: any, expandedRows: any[]) => {
 
 const openUpload = (row: AmfApi.AmfBusinessVO) => {
   uploadTargetBusiness.value = row; uploadTargetFile.value = null
-  uploadForm.desc = ''; uploadForm.file = undefined
-  uploadElRef.value?.clearFiles(); uploadVisible.value = true
+  uploadForm.desc = ''; uploadForm.file = undefined; uploadForm.versionNo = ''; uploadForm.effectiveDate = ''
+  uploadFileEntries.value = [{ file: undefined, versionNo: '', effectiveDate: '' }]
+  uploadEntryRefs.value = []
+  uploadVisible.value = true
 }
 
 const uploadNewFileVersion = (biz: AmfApi.AmfBusinessVO, file: AmfApi.AmfFileVO) => {
   uploadTargetBusiness.value = biz; uploadTargetFile.value = file
-  uploadForm.desc = ''; uploadForm.file = undefined
+  uploadForm.desc = ''; uploadForm.file = undefined; uploadForm.versionNo = ''; uploadForm.effectiveDate = ''
   uploadElRef.value?.clearFiles(); uploadVisible.value = true
 }
 
@@ -195,36 +251,79 @@ const onUploadFileChange: UploadProps['onChange'] = (f) => {
   uploadForm.file = file
 }
 
+const handleUploadEntryFile = (uploadFile: any, index: number) => {
+  const file = uploadFile.raw as UploadRawFile
+  if (file.size > 50 * 1024 * 1024) { message.error('文件超过50MB'); return }
+  uploadFileEntries.value[index].file = file
+}
+
+const onUploadExceed: UploadProps['onExceed'] = () => { message.error('文件数量已达上限') }
+
 const doUploadFile = async () => {
-  if (!uploadForm.file) { message.warning('请选择文件'); return }
   if (!uploadTargetBusiness.value) return
-  uploadLoading.value = true
-  try {
-    await AmfApi.uploadFile(uploadTargetBusiness.value.id!, uploadForm.file, uploadForm.desc, uploadTargetFile.value?.id)
-    message.success('上传成功'); uploadVisible.value = false
-    const biz = list.value.find(b => b.id === uploadTargetBusiness.value!.id)
-    if (biz) {
-      biz._fileLoading = true
-      try { biz._files = (await AmfApi.getFileList(biz.id!)).map((f: any) => ({ ...f, _verLoading: false, _versions: [] })) }
-      finally { biz._fileLoading = false }
+  if (uploadTargetFile.value) {
+    // 上传新版本：单文件
+    if (!uploadForm.file) { message.warning('请选择文件'); return }
+    if (!uploadForm.versionNo) { message.warning('请输入版本号'); return }
+    if (!uploadForm.effectiveDate) { message.warning('请选择签字生效日期'); return }
+    uploadLoading.value = true
+    try {
+      await AmfApi.uploadFile(uploadTargetBusiness.value.id!, uploadForm.file, uploadForm.desc, uploadTargetFile.value.id, uploadForm.versionNo, uploadForm.effectiveDate)
+      message.success('上传成功'); uploadVisible.value = false
+      refreshFiles()
+    } catch (e: any) { message.error(e?.message || '上传失败') }
+    finally { uploadLoading.value = false }
+  } else {
+    // 上传新文件：多文件表格
+    const entries = uploadFileEntries.value.filter(e => e.file)
+    if (entries.length === 0) { message.warning('请选择文件'); return }
+    for (const entry of entries) {
+      if (!entry.versionNo || !entry.versionNo.trim()) { message.warning('请输入版本号'); return }
+      if (!entry.effectiveDate) { message.warning('请选择签字生效日期'); return }
     }
-  } finally { uploadLoading.value = false }
+    // 检测同名文件
+    const biz = list.value.find(b => b.id === uploadTargetBusiness.value!.id)
+    const existingNames = biz?._files?.map(f => f.fileName) || []
+    const dupNames = entries.filter(e => existingNames.includes(e.file!.name)).map(e => e.file!.name)
+    if (dupNames.length > 0) {
+      try { await message.confirm(`文件「${dupNames.join('、')}」已存在，若想上传新版本请到列表右侧上传新版本按钮，是否继续上传？`) }
+      catch { return }
+    }
+    uploadLoading.value = true
+    try {
+      let ok = 0
+      for (const entry of entries) {
+        try { await AmfApi.uploadFile(uploadTargetBusiness.value.id!, entry.file!, undefined, undefined, entry.versionNo, entry.effectiveDate); ok++ } catch (e) { console.error('上传失败:', entry.file!.name, e) }
+      }
+      message.success(`上传完成（${ok}/${entries.length}）`); uploadVisible.value = false
+      refreshFiles()
+    } finally { uploadLoading.value = false }
+  }
+}
+
+const refreshFiles = async () => {
+  const biz = list.value.find(b => b.id === uploadTargetBusiness.value!.id)
+  if (biz) {
+    biz._fileLoading = true
+    try { biz._files = (await AmfApi.getFileList(biz.id!)).map((f: any) => ({ ...f, _verLoading: false, _versions: [] })) }
+    finally { biz._fileLoading = false }
+  }
 }
 
 const previewFile = async (_: AmfApi.AmfBusinessVO, f: any) => {
-  const versions = await AmfApi.getFileVersionList(f.id!)
-  if (!versions.length) { message.warning('暂无版本'); return }
-  router.push({ path: '/amf/editor', query: { versionId: versions[0].id, businessId: _.id } })
+  if (!f._versions?.length) { f._versions = await AmfApi.getFileVersionList(f.id!) }
+  if (!f._versions?.length) { message.warning('暂无版本'); return }
+  router.push({ path: '/amf/editor', query: { versionId: f._versions[0].id, businessId: _.id } })
 }
 
 const previewVersion = (v: AmfApi.AmfFileVersionVO) => {
   router.push({ path: '/amf/editor', query: { versionId: v.id, businessId: v.businessId } })
 }
 
-const downloadFile = async (f: AmfApi.AmfFileVO) => {
-  const versions = await AmfApi.getFileVersionList(f.id!)
-  if (!versions.length) { message.warning('暂无版本'); return }
-  doDownload(versions[0].id!, versions[0].fileName)
+const downloadFile = async (f: any) => {
+  if (!f._versions?.length) { f._versions = await AmfApi.getFileVersionList(f.id!) }
+  if (!f._versions?.length) { message.warning('暂无版本'); return }
+  doDownload(f._versions[0].id!, f._versions[0].fileName)
 }
 
 const downloadVersion = (v: AmfApi.AmfFileVersionVO) => {
@@ -247,11 +346,7 @@ const doDownload = async (versionId: number, fileName: string) => {
   }
 }
 
-const deleteFileRow = async (biz: any, f: AmfApi.AmfFileVO) => {
-  try { await message.delConfirm(); await AmfApi.deleteFile(f.id!); message.success('已删除'); biz._files = biz._files.filter((x: any) => x.id !== f.id) } catch {}
-}
-
-const deleteVersion = async (biz: any, _files: any[], f: any, v: AmfApi.AmfFileVersionVO) => {
+const deleteVersion = async (biz: any, f: any, v: AmfApi.AmfFileVersionVO) => {
   try {
     await message.delConfirm(); await AmfApi.deleteFileVersion(v.id!); message.success('已删除')
     f._versions = f._versions.filter((x: any) => x.id !== v.id)
@@ -294,5 +389,24 @@ onMounted(() => getList())
       .el-table__body-wrapper .el-table__row:hover > td { background: rgba(64,158,255,0.1) !important; }
     }
   }
+  .file-name-btn {
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .required-label::before {
+    content: '*';
+    color: #f56c6c;
+    margin-right: 4px;
+  }
+}
+</style>
+
+<style lang="scss">
+.upload-dragger--compact .el-upload-dragger {
+  padding: 20px 16px;
+  height: auto;
+  min-height: 100px;
 }
 </style>

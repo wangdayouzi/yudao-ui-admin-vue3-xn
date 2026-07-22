@@ -13,7 +13,7 @@ export interface AmfBusinessVO {
   effectiveDate?: string
   fileName?: string
   fileUrl?: string
-  fileVersion?: number
+  fileVersion?: string
   status: number
   createTime?: Date
   updateTime?: Date
@@ -25,7 +25,7 @@ export interface AmfBusinessVO {
 export interface AmfFileVersionVO {
   id?: number
   businessId: number
-  versionNo: number
+  versionNo: string
   fileName: string
   fileUrl: string
   fileSize?: number
@@ -69,7 +69,8 @@ export interface AmfFileVO {
   businessId: number
   fileName: string
   fileUrl?: string
-  fileVersion?: number
+  fileVersion?: string
+  effectiveDate?: string
   createTime?: Date
 }
 
@@ -88,8 +89,15 @@ export const deleteFile = (fileId: number) => {
 // ==================== 文件上传 API ====================
 
 // 上传文件（新版本）
-// fileId 可选：指定时为该文件记录追加版本（不按文件名匹配）；不指定时按文件名匹配已有文件
-export const uploadFile = (businessId: number, file: File, changeDescription?: string, fileId?: number): Promise<AmfFileVersionVO> => {
+// fileId 可选：指定时为该文件记录追加版本；不指定时新建文件记录
+export const uploadFile = (
+  businessId: number,
+  file: File,
+  changeDescription?: string,
+  fileId?: number,
+  versionNo?: string,
+  effectiveDate?: string
+): Promise<AmfFileVersionVO> => {
   const formData = new FormData()
   formData.append('businessId', String(businessId))
   if (fileId) {
@@ -98,6 +106,12 @@ export const uploadFile = (businessId: number, file: File, changeDescription?: s
   formData.append('file', file)
   if (changeDescription) {
     formData.append('changeDescription', changeDescription)
+  }
+  if (versionNo) {
+    formData.append('versionNo', versionNo)
+  }
+  if (effectiveDate) {
+    formData.append('effectiveDate', effectiveDate)
   }
   return request.post({
     url: '/amf/business/upload',
