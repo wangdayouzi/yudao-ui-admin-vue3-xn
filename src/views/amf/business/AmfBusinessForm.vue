@@ -28,6 +28,8 @@
           type="date"
           placeholder="请选择签字生效日期"
           value-format="YYYY-MM-DD"
+          :editable="false"
+          :shortcuts="dateShortcuts"
         />
       </el-form-item>
       <!-- 新增时可上传文件 -->
@@ -67,6 +69,8 @@
                   value-format="YYYY-MM-DD"
                   size="small"
                   class="!w-full"
+                  :editable="false"
+                  :shortcuts="dateShortcuts"
                 />
               </template>
             </el-table-column>
@@ -92,6 +96,7 @@ import * as AmfApi from '@/api/amf/index'
 import UserSelectV2 from '@/views/system/user/components/UserSelectV2.vue'
 import type { UploadRawFile } from 'element-plus'
 import { CommonStatusEnum } from '@/utils/constants'
+import { dateShortcuts } from '@/utils/formatTime'
 
 defineOptions({ name: 'AmfBusinessForm' })
 
@@ -182,6 +187,8 @@ const submitForm = async () => {
 
 const resetForm = () => {
   formData.value = { id: undefined, methodNo: '', methodVersion: '', methodName: '', testArticle: '', matrixType: '', sd: undefined, effectiveDate: '', changeDescription: '' }
+  // 清除 el-upload 内部文件状态，防止下次打开时误触 :limit 限制
+  uploadRefs.value.forEach(ref => ref?.clearFiles())
   fileEntries.value = [{ file: undefined, versionNo: '', effectiveDate: '' }]
   uploadRefs.value = []
 }

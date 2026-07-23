@@ -97,7 +97,7 @@
 
     <AmfBusinessForm ref="formRef" @success="getList" />
 
-    <el-dialog v-model="uploadVisible" :title="uploadTargetFile ? '上传新版本' : '上传新文件'" :width="uploadTargetFile ? '560px' : '750px'" :close-on-click-modal="false">
+    <el-dialog v-model="uploadVisible" :title="uploadTargetFile ? '上传新版本' : '上传新文件'" :width="uploadTargetFile ? '560px' : '750px'" :close-on-click-modal="false" destroy-on-close>
       <!-- 新版本：单文件 -->
       <template v-if="uploadTargetFile">
         <el-form :model="uploadForm" label-width="110px">
@@ -111,7 +111,7 @@
             <el-input v-model="uploadForm.versionNo" placeholder="请输入版本号（如 V2.0）" class="!w-full" />
           </el-form-item>
           <el-form-item label="签字生效日期" required>
-            <el-date-picker v-model="uploadForm.effectiveDate" type="date" value-format="YYYY-MM-DD" placeholder="请选择签字生效日期" class="!w-full" />
+            <el-date-picker v-model="uploadForm.effectiveDate" type="date" value-format="YYYY-MM-DD" placeholder="请选择签字生效日期" class="!w-full" :editable="false" :shortcuts="dateShortcuts" />
           </el-form-item>
           <el-form-item label="变更说明">
             <el-input v-model="uploadForm.desc" type="textarea" :rows="2" placeholder="可选" />
@@ -146,7 +146,7 @@
           <el-table-column width="170">
             <template #header><span class="required-label">签字生效日期</span></template>
             <template #default="{ row }">
-              <el-date-picker v-model="row.effectiveDate" type="date" value-format="YYYY-MM-DD" placeholder="请选择" size="small" class="!w-full" />
+              <el-date-picker v-model="row.effectiveDate" type="date" value-format="YYYY-MM-DD" placeholder="请选择" size="small" class="!w-full" :editable="false" :shortcuts="dateShortcuts" />
             </template>
           </el-table-column>
           <el-table-column label="操作" width="60" align="center">
@@ -171,6 +171,7 @@ import * as AmfApi from '@/api/amf/index'
 import AmfBusinessForm from './AmfBusinessForm.vue'
 import { useRouter } from 'vue-router'
 import type { UploadRawFile, UploadProps } from 'element-plus'
+import { dateShortcuts } from '@/utils/formatTime'
 
 defineOptions({ name: 'AmfBusiness' })
 
@@ -234,6 +235,8 @@ const onFileExpand = async (fileRow: any, expandedRows: any[]) => {
 const openUpload = (row: AmfApi.AmfBusinessVO) => {
   uploadTargetBusiness.value = row; uploadTargetFile.value = null
   uploadForm.desc = ''; uploadForm.file = undefined; uploadForm.versionNo = ''; uploadForm.effectiveDate = ''
+  // 清除 el-upload 内部文件状态
+  uploadEntryRefs.value.forEach(ref => ref?.clearFiles())
   uploadFileEntries.value = [{ file: undefined, versionNo: '', effectiveDate: '' }]
   uploadEntryRefs.value = []
   uploadVisible.value = true
@@ -305,7 +308,16 @@ const refreshFiles = async () => {
   const biz = list.value.find(b => b.id === uploadTargetBusiness.value!.id)
   if (biz) {
     biz._fileLoading = true
-    try { biz._files = (await AmfApi.getFileList(biz.id!)).map((f: any) => ({ ...f, _verLoading: false, _versions: [] })) }
+    try {
+      biz._files = (await AmfApi.getFileList(biz.id!)).map((f: any) => ({ ...f, _verLoading: false, _versions: [] }))
+      // 如果上传新版本时对应文件已展开版本列表，自动刷新版本数据
+      if (uploadTargetFile.value) {
+        const targetFile = biz._files.find((f: any) => f.id === uploadTargetFile.value.id)
+        if (targetFile) {
+          targetFile._versions = await AmfApi.getFileVersionList(targetFile.id)
+        }
+      }
+    }
     finally { biz._fileLoading = false }
   }
 }

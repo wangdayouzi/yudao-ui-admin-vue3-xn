@@ -53,6 +53,40 @@ export const defaultShortcuts = [
 ]
 
 /**
+ * 单日期快捷选项，适用于 el-date-picker type="date"（仅过去日期）
+ */
+export const dateShortcuts = [
+  {
+    text: '今天',
+    value: () => new Date()
+  },
+  {
+    text: '昨天',
+    value: () => {
+      const date = new Date()
+      date.setDate(date.getDate() - 1)
+      return date
+    }
+  },
+  {
+    text: '一周前',
+    value: () => {
+      const date = new Date()
+      date.setDate(date.getDate() - 7)
+      return date
+    }
+  },
+  {
+    text: '一个月前',
+    value: () => {
+      const date = new Date()
+      date.setMonth(date.getMonth() - 1)
+      return date
+    }
+  }
+]
+
+/**
  * 时间日期转换
  * @param date 当前时间，支持 new Date()、字符串、时间戳、dayjs 等格式
  * @param format 需要转换的时间格式字符串
