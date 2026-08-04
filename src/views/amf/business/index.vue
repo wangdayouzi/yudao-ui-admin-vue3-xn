@@ -158,7 +158,7 @@
         <el-button class="mt-8px" size="small" type="primary" plain @click="uploadFileEntries.push({ file: undefined, versionNo: '', effectiveDate: '' })">+ 添加文件</el-button>
       </template>
       <template #footer>
-        <el-button :disabled="uploadLoading" type="primary" @click="doUploadFile">确定上传</el-button>
+        <el-button :disabled="uploadLoading" :loading="uploadLoading" type="primary" @click="doUploadFile">确定上传</el-button>
         <el-button @click="uploadVisible = false">取消</el-button>
       </template>
     </el-dialog>
