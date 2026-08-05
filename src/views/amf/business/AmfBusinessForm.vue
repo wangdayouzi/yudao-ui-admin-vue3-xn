@@ -22,6 +22,9 @@
       <el-form-item label="SD">
         <UserSelectV2 v-model="formData.sd" placeholder="请选择SD" />
       </el-form-item>
+      <el-form-item label="申办方">
+        <el-input v-model="formData.sponsor" placeholder="请输入申办方" />
+      </el-form-item>
       <el-form-item v-if="formType === 'update'" label="签字生效日期">
         <el-date-picker
           v-model="formData.effectiveDate"
@@ -125,6 +128,7 @@ const formData = ref({
   testArticle: '',
   matrixType: '',
   sd: undefined,
+  sponsor: '',
   effectiveDate: '',
   changeDescription: ''
 })
@@ -154,7 +158,7 @@ const open = async (type: string, id?: number) => {
     formLoading.value = true
     try {
       const data = await AmfApi.getBusiness(id)
-      formData.value = { id: data.id, methodNo: data.methodNo, methodVersion: data.methodVersion || '', methodName: data.methodName || '', testArticle: data.testArticle || '', matrixType: data.matrixType || '', sd: data.sd || undefined, effectiveDate: data.effectiveDate || '', changeDescription: '' }
+      formData.value = { id: data.id, methodNo: data.methodNo, methodVersion: data.methodVersion || '', methodName: data.methodName || '', testArticle: data.testArticle || '', matrixType: data.matrixType || '', sd: data.sd || undefined, sponsor: data.sponsor || '', effectiveDate: data.effectiveDate || '', changeDescription: '' }
     } finally { formLoading.value = false }
   }
 }
@@ -177,7 +181,7 @@ const submitForm = async () => {
       }
       message.success(t('common.createSuccess'))
     } else {
-      await AmfApi.updateBusiness({ id: formData.value.id, methodNo: formData.value.methodNo, methodVersion: formData.value.methodVersion, methodName: formData.value.methodName, testArticle: formData.value.testArticle, matrixType: formData.value.matrixType, sd: formData.value.sd, effectiveDate: formData.value.effectiveDate, status: CommonStatusEnum.ENABLE } as any)
+      await AmfApi.updateBusiness({ id: formData.value.id, methodNo: formData.value.methodNo, methodVersion: formData.value.methodVersion, methodName: formData.value.methodName, testArticle: formData.value.testArticle, matrixType: formData.value.matrixType, sd: formData.value.sd, sponsor: formData.value.sponsor, effectiveDate: formData.value.effectiveDate, status: CommonStatusEnum.ENABLE } as any)
       message.success(t('common.updateSuccess'))
     }
     dialogVisible.value = false
@@ -186,7 +190,7 @@ const submitForm = async () => {
 }
 
 const resetForm = () => {
-  formData.value = { id: undefined, methodNo: '', methodVersion: '', methodName: '', testArticle: '', matrixType: '', sd: undefined, effectiveDate: '', changeDescription: '' }
+  formData.value = { id: undefined, methodNo: '', methodVersion: '', methodName: '', testArticle: '', matrixType: '', sd: undefined, sponsor: '', effectiveDate: '', changeDescription: '' }
   // 清除 el-upload 内部文件状态，防止下次打开时误触 :limit 限制
   uploadRefs.value.forEach(ref => ref?.clearFiles())
   fileEntries.value = [{ file: undefined, versionNo: '', effectiveDate: '' }]

@@ -78,10 +78,15 @@
         </el-table-column>
         <el-table-column align="center" label="编号" prop="id" width="80" />
         <el-table-column align="center" label="方法编号" prop="methodNo" show-overflow-tooltip />
-        <el-table-column align="center" label="方法名称" prop="methodName" show-overflow-tooltip min-width="130" />
+        <el-table-column align="center" label="方法名称" prop="methodName" min-width="200">
+          <template #default="{ row }">
+            <div class="cell-wrap">{{ row.methodName }}</div>
+          </template>
+        </el-table-column>
         <el-table-column align="center" label="测试物" prop="testArticle" show-overflow-tooltip />
         <el-table-column align="center" label="基质类型" prop="matrixType" show-overflow-tooltip />
         <el-table-column align="center" label="SD" prop="sd" show-overflow-tooltip width="80" />
+        <el-table-column align="center" label="申办方" prop="sponsor" show-overflow-tooltip min-width="120" />
         <el-table-column :formatter="dateFormatter2" align="center" label="签字生效日期" prop="effectiveDate" width="120" />
         <el-table-column :formatter="dateFormatter" align="center" label="创建时间" prop="createTime" width="170" />
         <el-table-column align="center" label="操作" width="200" fixed="right">
@@ -183,7 +188,7 @@ const loading = ref(true)
 const total = ref(0)
 const list = ref<(AmfApi.AmfBusinessVO & { _fileLoading?: boolean; _files?: (AmfApi.AmfFileVO & { _verLoading?: boolean; _versions?: AmfApi.AmfFileVersionVO[] })[] })[]>([])
 
-const queryParams = reactive({ pageNo: 1, pageSize: 10, methodNo: '', methodVersion: '', methodName: '', testArticle: '', matrixType: '', sd: '', effectiveDate: '' })
+const queryParams = reactive({ pageNo: 1, pageSize: 15, methodNo: '', methodVersion: '', methodName: '', testArticle: '', matrixType: '', sd: '', effectiveDate: '' })
 const queryFormRef = ref()
 const tableRef = ref()
 
@@ -325,11 +330,13 @@ const refreshFiles = async () => {
 const previewFile = async (_: AmfApi.AmfBusinessVO, f: any) => {
   if (!f._versions?.length) { f._versions = await AmfApi.getFileVersionList(f.id!) }
   if (!f._versions?.length) { message.warning('暂无版本'); return }
-  router.push({ path: '/amf/editor', query: { versionId: f._versions[0].id, businessId: _.id } })
+  const url = router.resolve({ path: '/amf/editor', query: { versionId: f._versions[0].id, businessId: _.id } }).href
+  window.open(url, '_blank')
 }
 
 const previewVersion = (v: AmfApi.AmfFileVersionVO) => {
-  router.push({ path: '/amf/editor', query: { versionId: v.id, businessId: v.businessId } })
+  const url = router.resolve({ path: '/amf/editor', query: { versionId: v.id, businessId: v.businessId } }).href
+  window.open(url, '_blank')
 }
 
 const downloadFile = async (f: any) => {
@@ -411,6 +418,11 @@ onMounted(() => getList())
     content: '*';
     color: #f56c6c;
     margin-right: 4px;
+  }
+  .cell-wrap {
+    white-space: normal;
+    word-break: break-all;
+    line-height: 1.4;
   }
 }
 </style>

@@ -830,22 +830,18 @@ const remainingRouter: AppRouteRecordRaw[] = [
     name: 'AmfRouter',
     meta: {
       hidden: true
-    },
-    children: [
-      {
-        path: 'editor',
-        component: () => import('@/views/amf/business/AmfOnlyOfficeEditor.vue'),
-        name: 'AmfOnlyOfficeEditor',
-        meta: {
-          noCache: true,
-          hidden: true,
-          canTo: true,
-          icon: 'ep:document',
-          title: '预览分析方法文件',
-          activeMenu: '/amf/business'
-        }
-      }
-    ]
+    }
+  },
+  {
+    path: '/amf/editor',
+    component: () => import('@/views/amf/business/AmfOnlyOfficeEditor.vue'),
+    name: 'AmfOnlyOfficeEditor',
+    meta: {
+      noCache: true,
+      hidden: true,
+      canTo: true,
+      title: '预览分析方法文件'
+    }
   }
 ]
 

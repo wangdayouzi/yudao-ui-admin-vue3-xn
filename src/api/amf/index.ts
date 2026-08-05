@@ -11,6 +11,7 @@ export interface AmfBusinessVO {
   matrixType?: string
   sd?: string
   effectiveDate?: string
+  sponsor?: string
   fileName?: string
   fileUrl?: string
   fileVersion?: string

@@ -1,7 +1,7 @@
 <template>
   <div class="onlyoffice-editor-page">
     <div class="editor-toolbar">
-      <el-button @click="goBack"><Icon icon="ep:arrow-left" class="mr-4px" />返回</el-button>
+      <el-button @click="closeTab"><Icon icon="ep:close" class="mr-4px" />关闭</el-button>
       <span class="editor-title">{{ fileName }} - v{{ versionNo }}</span>
       <el-tag v-if="loading" type="warning" size="small">正在加载编辑器...</el-tag>
       <el-tag v-else-if="errorMsg" type="danger" size="small">加载失败</el-tag>
@@ -11,7 +11,7 @@
       <el-result icon="error" title="编辑器加载失败" :sub-title="errorMsg">
         <template #extra>
           <el-button type="primary" @click="loadEditor">重新加载</el-button>
-          <el-button @click="goBack">返回列表</el-button>
+          <el-button @click="closeTab">关闭页面</el-button>
         </template>
       </el-result>
     </div>
@@ -85,6 +85,7 @@ const loadOnlyOfficeScript = (config: any): Promise<void> => {
 }
 
 const goBack = () => { destroyEditor(); router.back() }
+const closeTab = () => { destroyEditor(); window.close() }
 const destroyEditor = () => { if (docEditor) { try { docEditor.destroyEditor() } catch (e) {}; docEditor = null } }
 onBeforeUnmount(() => { destroyEditor(); document.title = '芋道快速开发平台' })
 onDeactivated(() => { destroyEditor(); document.title = '芋道快速开发平台' })
@@ -95,7 +96,7 @@ onMounted(() => loadEditor())
 .onlyoffice-editor-page {
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 84px);
+  height: 100vh;
   overflow: hidden;
   background: #f0f2f5;
 
