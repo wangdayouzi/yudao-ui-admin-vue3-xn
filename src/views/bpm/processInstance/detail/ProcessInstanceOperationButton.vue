@@ -234,7 +234,7 @@
           label-width="100px"
         >
           <el-form-item label="新审批人" prop="assigneeUserId">
-            <el-select v-model="transferForm.assigneeUserId" clearable style="width: 100%">
+            <el-select v-model="transferForm.assigneeUserId" clearable filterable style="width: 100%">
               <el-option
                 v-for="item in userOptions"
                 :key="item.id"
@@ -286,7 +286,7 @@
           label-width="100px"
         >
           <el-form-item label="接收人" prop="delegateUserId">
-            <el-select v-model="delegateForm.delegateUserId" clearable style="width: 100%">
+            <el-select v-model="delegateForm.delegateUserId" clearable filterable style="width: 100%">
               <el-option
                 v-for="item in userOptions"
                 :key="item.id"

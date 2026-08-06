@@ -38,6 +38,15 @@
               class="!w-240px"
             />
           </el-form-item>
+          <el-form-item label="用户昵称" prop="nickname">
+            <el-input
+              v-model="queryParams.nickname"
+              placeholder="请输入用户昵称"
+              clearable
+              @keyup.enter="handleQuery"
+              class="!w-240px"
+            />
+          </el-form-item>
           <el-form-item label="状态" prop="status">
             <el-select
               v-model="queryParams.status"
@@ -234,6 +243,7 @@ const queryParams = reactive({
   pageSize: 10,
   username: undefined,
   mobile: undefined,
+  nickname: undefined,
   status: undefined,
   deptId: undefined as number | undefined,
   createTime: []
