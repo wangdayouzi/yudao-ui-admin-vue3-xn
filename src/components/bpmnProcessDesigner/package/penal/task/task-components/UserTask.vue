@@ -83,6 +83,7 @@
         v-model="userTaskForm.candidateParam"
         clearable
         multiple
+        filterable
         style="width: 100%"
         @change="updateElementTask"
       >

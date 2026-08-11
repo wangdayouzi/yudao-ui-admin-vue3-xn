@@ -148,7 +148,7 @@
 
       <!-- ==================== 物流信息区块（仅样品组处理时显示） ==================== -->
       <template v-if="mode === 'ship'">
-        <el-divider content-position="left">物流信息（必填）</el-divider>
+        <el-divider content-position="left">物流信息</el-divider>
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="快递单号" prop="trackingNumber">
@@ -204,16 +204,31 @@
             </template>
           </el-table-column>
           <el-table-column label="发货单号" prop="shipmentNo" min-width="170" />
-          <el-table-column label="快递公司" prop="expressCompany" min-width="120" />
-          <el-table-column label="快递单号" prop="trackingNumber" min-width="160" />
+          <el-table-column label="快递公司" min-width="130">
+            <template #default="scope">
+              <el-input v-if="scope.row._editing" v-model="scope.row.expressCompany" size="small" placeholder="物流公司" />
+              <span v-else>{{ scope.row.expressCompany || '-' }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="快递单号" min-width="170">
+            <template #default="scope">
+              <el-input v-if="scope.row._editing" v-model="scope.row.trackingNumber" size="small" placeholder="快递单号" />
+              <span v-else>{{ scope.row.trackingNumber || '-' }}</span>
+            </template>
+          </el-table-column>
           <el-table-column label="发货时间" min-width="170">
             <template #default="scope">{{ formatDate(scope.row.createTime) }}</template>
           </el-table-column>
-          <el-table-column label="操作" width="70">
+          <el-table-column label="操作" width="170">
             <template #default="scope">
-              <el-button link type="warning" size="small" @click="handleRevokeShipment(scope.row.id)">
-                撤回
-              </el-button>
+              <template v-if="!scope.row._editing">
+                <el-button link type="primary" size="small" @click="startEditLogistics(scope.row)">编辑物流</el-button>
+                <el-button link type="warning" size="small" @click="handleRevokeShipment(scope.row.id)">撤回</el-button>
+              </template>
+              <template v-else>
+                <el-button link type="primary" size="small" @click="saveLogistics(scope.row)">保存</el-button>
+                <el-button link type="info" size="small" @click="cancelEditLogistics(scope.row)">取消</el-button>
+              </template>
             </template>
           </el-table-column>
         </el-table>
@@ -245,16 +260,31 @@
             </template>
           </el-table-column>
           <el-table-column label="发货单号" prop="shipmentNo" min-width="170" />
-          <el-table-column label="快递公司" prop="expressCompany" min-width="120" />
-          <el-table-column label="快递单号" prop="trackingNumber" min-width="160" />
+          <el-table-column label="快递公司" min-width="130">
+            <template #default="scope">
+              <el-input v-if="scope.row._editing" v-model="scope.row.expressCompany" size="small" placeholder="物流公司" />
+              <span v-else>{{ scope.row.expressCompany || '-' }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="快递单号" min-width="170">
+            <template #default="scope">
+              <el-input v-if="scope.row._editing" v-model="scope.row.trackingNumber" size="small" placeholder="快递单号" />
+              <span v-else>{{ scope.row.trackingNumber || '-' }}</span>
+            </template>
+          </el-table-column>
           <el-table-column label="发货时间" min-width="170">
             <template #default="scope">{{ formatDate(scope.row.createTime) }}</template>
           </el-table-column>
-          <el-table-column label="操作" width="70">
+          <el-table-column label="操作" width="170">
             <template #default="scope">
-              <el-button link type="warning" size="small" @click="handleRevokeShipment(scope.row.id)">
-                撤回
-              </el-button>
+              <template v-if="!scope.row._editing">
+                <el-button link type="primary" size="small" @click="startEditLogistics(scope.row)">编辑物流</el-button>
+                <el-button link type="warning" size="small" @click="handleRevokeShipment(scope.row.id)">撤回</el-button>
+              </template>
+              <template v-else>
+                <el-button link type="primary" size="small" @click="saveLogistics(scope.row)">保存</el-button>
+                <el-button link type="info" size="small" @click="cancelEditLogistics(scope.row)">取消</el-button>
+              </template>
             </template>
           </el-table-column>
         </el-table>
@@ -394,7 +424,7 @@ const fillConsignorShanghai = () => {
     consignorUnit: '精翰生物',
     consignorAddress: '上海市浦东新区张江高科技园区XXX号',
     consignorName: '仓库管理员',
-    consignorPhone: '021-XXXXXXXX'
+    consignorPhone: '021-99998888'
   })
 }
 const fillConsignorNingbo = () => {
@@ -402,7 +432,7 @@ const fillConsignorNingbo = () => {
     consignorUnit: '精翰生物',
     consignorAddress: '宁波市杭州湾新区XXX号',
     consignorName: '宁波仓管员',
-    consignorPhone: '0574-XXXXXXXX'
+    consignorPhone: '0574-99998888'
   })
 }
 
@@ -411,7 +441,7 @@ const formData = reactive<ReagentApi.ReagentApplyVO>({
   consignorUnit: '精翰生物',
   consignorAddress: '上海市浦东新区张江高科技园区XXX号',
   consignorName: '仓库管理员',
-  consignorPhone: '021-XXXXXXXX',
+  consignorPhone: '021-99998888',
   receiverUnit: '',
   receiverAddress: '',
   receiverName: '',
@@ -490,6 +520,33 @@ const handleRevokeShipment = async (shipmentId: number) => {
     emit('success')
   } catch {
     message.error('撤回失败')
+  }
+}
+
+/** 开始编辑物流信息（缓存原值，用于取消） */
+const startEditLogistics = (row: any) => {
+  row._editing = true
+  row._origExpressCompany = row.expressCompany
+  row._origTrackingNumber = row.trackingNumber
+}
+/** 取消编辑物流信息：还原原值 */
+const cancelEditLogistics = (row: any) => {
+  row.expressCompany = row._origExpressCompany
+  row.trackingNumber = row._origTrackingNumber
+  row._editing = false
+}
+/** 保存物流信息（快递单号/物流公司） */
+const saveLogistics = async (row: any) => {
+  try {
+    await ReagentApi.updateShipmentLogistics({
+      id: row.id,
+      trackingNumber: row.trackingNumber,
+      expressCompany: row.expressCompany
+    })
+    message.success('物流信息已保存')
+    row._editing = false
+  } catch {
+    message.error('保存失败')
   }
 }
 
@@ -714,10 +771,6 @@ const handleReject = async () => {
 
 // ==================== 确认发货 ====================
 const handleConfirmShip = async () => {
-  if (!logisticsForm.trackingNumber || !logisticsForm.expressCompany) {
-    message.warning('请填写快递单号和物流公司')
-    return
-  }
   if (formData.freightSettlement === '我司（后续据实结算）' && !formData.projectNo?.trim()) {
     message.warning('我司结算时项目号必填')
     return
@@ -737,7 +790,9 @@ const handleConfirmShip = async () => {
   formLoading.value = true
   await nextTick()  // 让 loading 遮罩先渲染出来
   try {
-    await message.confirm(`确认发货？共 ${shipmentItems.length} 项，快递单号: ${logisticsForm.trackingNumber}`)
+    await message.confirm(
+      `确认发货？共 ${shipmentItems.length} 项${logisticsForm.trackingNumber ? `，快递单号: ${logisticsForm.trackingNumber}` : ''}`
+    )
   } catch {
     formLoading.value = false
     return

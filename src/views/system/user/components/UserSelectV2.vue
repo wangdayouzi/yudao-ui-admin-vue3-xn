@@ -71,7 +71,7 @@ defineOptions({ name: 'UserSelectV2', inheritAttrs: false })
 
 const props = withDefaults(
   defineProps<{
-    modelValue?: number | number[] // 绑定的用户 ID
+    modelValue?: number | number[] | string // 绑定的用户 ID；兼容已存名称文本（如 AMF 的 SD 字段）
     defaultCurrentUser?: boolean // 默认选中当前用户
     multiple?: boolean // 是否多选
     disabled?: boolean // 是否禁用
@@ -89,7 +89,7 @@ const props = withDefaults(
 )
 
 const emit = defineEmits<{
-  'update:modelValue': [value: number | number[] | undefined]
+  'update:modelValue': [value: number | number[] | string | undefined]
   change: [item: UserApi.UserVO | UserApi.UserVO[] | undefined]
 }>()
 
@@ -115,20 +115,38 @@ const suffixIcon = computed(() => {
 })
 
 /** 根据 ID 查询用户信息（用于编辑回显） */
-const resolveItemById = async (id: number | number[] | undefined) => {
+const resolveItemById = async (id: number | number[] | string | undefined) => {
   if (id === null || id === undefined) {
     selectedItems.value = []
     return
   }
-  const ids: number[] = Array.isArray(id) ? id : [id]
+  const ids: (number | string)[] = Array.isArray(id) ? id : [id]
+  // 兼容旧数据/名称字段：modelValue 可能是已保存的名称字符串（如 AMF 模块的 SD 字段存的是姓名）。
+  // 存在非数字值时直接按名称展示，不再调用 getUserList，避免后端 ids 参数类型转换报错。
+  const numericIds: number[] = []
+  const rawNames: string[] = []
+  ids.forEach((item) => {
+    const str = String(item).trim()
+    if (str !== '' && Number.isFinite(Number(str))) {
+      numericIds.push(Number(str))
+    } else {
+      rawNames.push(str)
+    }
+  })
+  if (rawNames.length > 0) {
+    selectedItems.value = rawNames.map(
+      (name) => ({ id: 0, nickname: name, username: name }) as UserApi.UserVO
+    )
+    return
+  }
   if (
-    selectedItems.value.length === ids.length &&
-    selectedItems.value.every((item) => ids.includes(item.id))
+    selectedItems.value.length === numericIds.length &&
+    selectedItems.value.every((item) => numericIds.includes(item.id))
   ) {
     return
   }
   try {
-    selectedItems.value = await UserApi.getUserList(ids)
+    selectedItems.value = await UserApi.getUserList(numericIds)
   } catch (e) {
     console.error('[UserSelectV2] resolveItemById failed:', e)
   }
@@ -164,12 +182,14 @@ const handleClick = (e: MouseEvent) => {
     }
     return
   }
-  // 打开弹窗，传入当前选中 ID 用于预选高亮
-  const selectedIds = props.multiple
-    ? props.modelValue || []
-    : props.modelValue !== null && props.modelValue !== undefined
-      ? [props.modelValue]
-      : []
+  // 打开弹窗，传入当前选中 ID 用于预选高亮（名称文本等非数字值不参与预选）
+  const selectedIds = (
+    Array.isArray(props.modelValue)
+      ? props.modelValue
+      : props.modelValue === null || props.modelValue === undefined
+        ? []
+        : [props.modelValue]
+  ).filter((v): v is number => typeof v === 'number')
   dialogRef.value.open(selectedIds, props.disabledIds)
 }
 

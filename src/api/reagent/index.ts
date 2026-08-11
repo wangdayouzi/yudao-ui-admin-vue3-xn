@@ -200,3 +200,12 @@ export const printShipments = (ids: number[]) => {
 export const revokeShipment = (id: number) => {
   return request.post({ url: '/reagent/shipment/revoke', params: { id } })
 }
+
+/** 更新发货物流信息（快递单号/物流公司） */
+export const updateShipmentLogistics = (data: {
+  id: number
+  trackingNumber?: string
+  expressCompany?: string
+}) => {
+  return request.post({ url: '/reagent/shipment/update-logistics', data })
+}

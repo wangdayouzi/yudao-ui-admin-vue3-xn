@@ -20,7 +20,7 @@
         <el-input v-model="formData.matrixType" placeholder="请输入基质类型" />
       </el-form-item>
       <el-form-item label="SD">
-        <UserSelectV2 v-model="formData.sd" placeholder="请选择SD" />
+        <UserSelectV2 v-model="formData.sd" placeholder="请选择SD" @change="onSdChange" />
       </el-form-item>
       <el-form-item label="申办方">
         <el-input v-model="formData.sponsor" placeholder="请输入申办方" />
@@ -96,6 +96,7 @@
 
 <script lang="ts" setup>
 import * as AmfApi from '@/api/amf/index'
+import type { UserVO } from '@/api/system/user'
 import UserSelectV2 from '@/views/system/user/components/UserSelectV2.vue'
 import type { UploadRawFile } from 'element-plus'
 import { CommonStatusEnum } from '@/utils/constants'
@@ -127,7 +128,7 @@ const formData = ref({
   methodName: '',
   testArticle: '',
   matrixType: '',
-  sd: undefined,
+  sd: undefined as number | string | undefined,
   sponsor: '',
   effectiveDate: '',
   changeDescription: ''
@@ -138,6 +139,11 @@ const formRules = reactive({
 })
 
 const formRef = ref()
+
+/** SD 选择用户后：存姓名文本（保持 sd 字段为文本，后续如需扩展成存用户 ID 只需改这里） */
+const onSdChange = (item: UserVO | undefined) => {
+  formData.value.sd = item ? item.nickname || item.username : ''
+}
 
 const handleFileEntryChange = (uploadFile: any, index: number) => {
   const file = uploadFile.raw as UploadRawFile
