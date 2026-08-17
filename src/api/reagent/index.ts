@@ -209,3 +209,23 @@ export const updateShipmentLogistics = (data: {
 }) => {
   return request.post({ url: '/reagent/shipment/update-logistics', data })
 }
+
+// ==================== 试剂标签打印 API ====================
+
+/** 试剂标签打印查询结果（来源：只读 SQL Server PM 库） */
+export interface ReagentLabelPrintVO {
+  name?: string // 名称
+  basId?: string // BASID
+  batchNo?: string // 批号
+  expireDate?: string // 过期日期
+}
+
+/** 根据 BASID 查询试剂标签信息（BASID 必填） */
+export const getLabelPrintByBasId = (basId: string) => {
+  return request.get({ url: '/reagent/label-print/query', params: { basId } })
+}
+
+/** 生成试剂标签打印 Excel（键值对表格），返回 Blob */
+export const printLabelPrint = (data: any) => {
+  return request.postOriginal({ url: '/reagent/label-print/print', data, responseType: 'blob' })
+}

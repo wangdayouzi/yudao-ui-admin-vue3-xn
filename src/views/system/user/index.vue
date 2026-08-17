@@ -6,7 +6,7 @@
   <el-row :gutter="20">
     <!-- 左侧部门树 -->
     <el-col :span="4" :xs="24">
-      <ContentWrap class="h-1/1">
+      <ContentWrap class="h-1/1">5
         <DeptTreeSelect @node-click="handleDeptNodeClick" />
       </ContentWrap>
     </el-col>

@@ -339,6 +339,9 @@ export enum DICT_TYPE {
   MES_WM_BARCODE_BIZ_TYPE = 'mes_wm_barcode_biz_type', // MES 条码业务类型
   MES_WM_PACKAGE_STATUS = 'mes_wm_package_status', // MES 装箱单状态
 
+  // ========== REAGENT - 试剂管理模块  ==========
+  REAGENT_STORAGE_CONDITION = 'reagent_storage_condition', // 试剂存储条件
+
   // ========== IM - 即时通讯模块  ==========
   IM_CONTENT_TYPE = 'im_content_type', // IM 内容类型
   IM_MESSAGE_STATUS = 'im_message_status', // IM 消息状态：0=正常 / 2=已撤回（私聊 / 群聊共用）
