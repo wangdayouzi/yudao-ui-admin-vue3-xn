@@ -49,13 +49,13 @@
       <div class="section-title">打印标签信息</div>
       <el-form :model="printForm" label-width="100px" style="max-width: 640px">
         <el-form-item label="名称" prop="name">
-          <el-input v-model="printForm.name" readonly />
+          <el-input v-model="printForm.name" placeholder="可修改" />
         </el-form-item>
         <el-form-item label="BASID" prop="basId">
-          <el-input v-model="printForm.basId" readonly />
+          <el-input v-model="printForm.basId" placeholder="可修改" />
         </el-form-item>
         <el-form-item label="批号" prop="batchNo">
-          <el-input v-model="printForm.batchNo" readonly />
+          <el-input v-model="printForm.batchNo" placeholder="可修改" />
         </el-form-item>
         <el-form-item label="存储条件" prop="storageCondition">
           <el-select v-model="printForm.storageCondition" placeholder="请选择存储条件" clearable style="width: 100%">
@@ -68,7 +68,7 @@
           </el-select>
         </el-form-item>
         <el-form-item label="过期日期" prop="expireDate">
-          <el-input v-model="printForm.expireDate" readonly />
+          <el-input v-model="printForm.expireDate" placeholder="可修改" />
         </el-form-item>
         <el-form-item label="接收人" prop="receiverName">
           <UserSelectV2 v-model="printForm.receiverId" placeholder="请选择接收人（显示昵称）" @change="onReceiverChange" />
@@ -90,11 +90,14 @@
         <el-button v-hasPermi="['reagent:label-print:print']" type="primary" @click="handlePreview">
           <Icon icon="ep:printer" />打印
         </el-button>
+        <el-button v-hasPermi="['reagent:label-print:print']" type="primary" plain @click="handleLabelPreview">
+          <Icon icon="ep:tickets" />打印标签
+        </el-button>
       </div>
     </ContentWrap>
 
     <!-- ============ 打印预览弹窗 ============ -->
-    <el-dialog v-model="previewVisible" title="试剂标签打印预览" width="580px" destroy-on-close>
+    <el-dialog v-model="previewVisible" title="试剂标签打印预览" width="620px" destroy-on-close>
       <table class="print-table">
         <tbody>
           <tr v-for="(item, index) in printRows" :key="index">
@@ -106,6 +109,27 @@
       <template #footer>
         <el-button @click="previewVisible = false">关 闭</el-button>
         <el-button type="primary" :loading="printLoading" @click="handlePrint">打 印</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- ============ 标签打印弹窗（36mm，浏览器打印到 PT-P900） ============ -->
+    <el-dialog v-model="labelVisible" title="标签预览（36mm）" width="560px" destroy-on-close>
+      <div class="label-preview-wrap">
+        <div id="labelPrintArea" class="label-sheet">
+          <div class="label-row"><span class="label-key">Name:</span><span class="label-val">{{ printForm.name }}</span></div>
+          <div class="label-row"><span class="label-key">BASID:</span><span class="label-val">{{ printForm.basId }}</span></div>
+          <div class="label-row"><span class="label-key">LOT:</span><span class="label-val">{{ printForm.batchNo }}</span></div>
+          <div class="label-row"><span class="label-key">Storage condition(unopen):</span><span class="label-val">{{ printForm.storageCondition }}</span></div>
+          <div class="label-row"><span class="label-key">Received date:</span><span class="label-val">{{ printForm.receiveDate }}</span></div>
+          <div class="label-row"><span class="label-key">Received by:</span><span class="label-val">{{ printForm.receiverName }}</span></div>
+          <div class="label-row"><span class="label-key">Exp.Date(unopen):</span><span class="label-val">{{ printForm.expireDate }}</span></div>
+          <div class="label-row"><span class="label-key">Remark:</span><span class="label-val">{{ printForm.remark }}</span></div>
+        </div>
+      </div>
+      <div class="label-tip">打印时务必：① 选择 PT-P900；② 更多设置 → 纸张尺寸选「shijibiaoqian」（1.4in × 1.18in）；③ 取消「页眉和页脚」；④ 缩放 100%。纸张不对会出现空白/裁切。</div>
+      <template #footer>
+        <el-button @click="labelVisible = false">关 闭</el-button>
+        <el-button type="primary" @click="handleLabelPrint">打 印</el-button>
       </template>
     </el-dialog>
   </div>
@@ -216,14 +240,14 @@ const printLoading = ref(false)
 
 /** 打印表格：每一行一个键值对，键和值各占一个单元格 */
 const printRows = computed(() => [
-  { label: '名称', value: printForm.name },
-  { label: 'BASID', value: printForm.basId },
-  { label: '批号', value: printForm.batchNo },
-  { label: '存储条件', value: printForm.storageCondition },
-  { label: '过期日期', value: printForm.expireDate },
-  { label: '接收人', value: printForm.receiverName },
-  { label: '接收日期', value: printForm.receiveDate },
-  { label: '备注', value: printForm.remark }
+  { label: 'Name:', value: printForm.name },
+  { label: 'BASID:', value: printForm.basId },
+  { label: 'LOT:', value: printForm.batchNo },
+  { label: 'Storage condition(unopen):', value: printForm.storageCondition },
+  { label: 'Received date:', value: printForm.receiveDate },
+  { label: 'Received by:', value: printForm.receiverName },
+  { label: 'Exp.Date(unopen):', value: printForm.expireDate },
+  { label: 'Remark:', value: printForm.remark }
 ])
 
 const handlePreview = async () => {
@@ -259,6 +283,24 @@ const downloadBlob = (res: any, fileName: string) => {
   a.click()
   window.URL.revokeObjectURL(url)
 }
+
+// ==================== 标签打印（36mm，浏览器打印到 PT-P900） ====================
+const labelVisible = ref(false)
+
+const handleLabelPreview = () => {
+  if (!selectedRow.value) {
+    message.warning('请先查询并选择批次')
+    return
+  }
+  labelVisible.value = true
+}
+
+/** 打印标签：window.print() 只输出 #labelPrintArea（见 @media print 样式）
+ *  注意：标签高度用固定值（30mm，与自定义纸张 shijibiaoqian 高度一致），不要用内容动态高度——
+ *  过小的 @page 会被 Chrome 回退成默认纸张，导致空白/裁切 */
+const handleLabelPrint = () => {
+  window.print()
+}
 </script>
 
 <style scoped>
@@ -287,5 +329,68 @@ const downloadBlob = (res: any, fileName: string) => {
   background: #f5f7fa;
   font-weight: bold;
   color: #303133;
+}
+
+/* ============ 36mm 标签 ============ */
+.label-preview-wrap {
+  display: inline-block;
+  padding: 6px;
+  background: #fff;
+  border: 1px dashed #c0c4cc;
+}
+
+.label-sheet {
+  width: 1.26in; /* ≈32mm，36mm 纸两侧各有 ~2mm 不可打印区，内容收窄到可打印区避免右边被裁 */
+  box-sizing: border-box;
+  padding: 0.6mm 2mm;
+  font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif;
+  font-size: 1.8mm;
+  line-height: 1.1;
+  color: #000;
+  background: #fff;
+}
+
+.label-row {
+  padding: 0.15mm 0;
+}
+
+.label-key {
+  font-weight: 600;
+}
+
+.label-val {
+  word-break: break-all;
+}
+
+.label-tip {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #909399;
+}
+</style>
+
+<style>
+/* 标签打印：只输出 #labelPrintArea，其余隐藏（用于 window.print()） */
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+  #labelPrintArea,
+  #labelPrintArea * {
+    visibility: visible !important;
+  }
+  #labelPrintArea {
+    position: fixed !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 1.26in !important; /* 收窄到可打印区，右边不被裁 */
+    border: none !important;
+    box-shadow: none !important;
+  }
+}
+@page {
+  /* 纸张 1.4in × 1.37in（宽×长），landscape 强制横向，避免被旋转成纵向导致第一行被裁 */
+  size: 1.4in 1.37in landscape;
+  margin: 0;
 }
 </style>
