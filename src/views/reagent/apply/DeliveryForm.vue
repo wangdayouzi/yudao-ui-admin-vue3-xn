@@ -50,49 +50,70 @@
         <Icon icon="ep:plus" />添加试剂
       </el-button>
       <el-table :data="formData.items" border size="small">
-        <el-table-column label="试剂名称" min-width="160">
+        <el-table-column v-if="!isReadonly" label="选择" width="76" fixed="left">
           <template #default="scope">
-            <el-select
-              v-if="!isReadonly"
-              v-model="scope.row.basId"
-              filterable
-              placeholder="选择试剂"
-              @change="(val: string) => onReagentChange(val, scope.$index)"
-            >
-              <el-option
-                v-for="r in reagentOptions"
-                :key="r.basId"
-                :label="`${r.basId} - ${r.reagentName}`"
-                :value="r.basId"
-              />
-            </el-select>
-            <span v-else>{{ scope.row.reagentName }}</span>
+            <el-button link type="primary" size="small" @click="openFlatPicker(scope.$index)">
+              <Icon icon="ep:search" />选择
+            </el-button>
           </template>
         </el-table-column>
-        <el-table-column label="试剂编号" prop="basId" width="120" />
-        <el-table-column label="货号" prop="catNo" width="120" />
-        <el-table-column label="规格/浓度" prop="content" width="100" />
-        <el-table-column label="储存温度" prop="storageTemp" width="100" />
-        <el-table-column label="储存位置" prop="storageLocation" width="140" />
-        <el-table-column label="批号" width="150">
+        <el-table-column label="试剂名称" min-width="180">
+          <template #default="scope">
+            <el-input v-if="!isReadonly" v-model="scope.row.reagentName" size="small" placeholder="试剂名称" />
+            <span v-else>{{ scope.row.reagentName || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="试剂编号" min-width="120">
+          <template #default="scope">
+            <el-input v-if="!isReadonly" v-model="scope.row.basId" size="small" placeholder="试剂编号" />
+            <span v-else>{{ scope.row.basId || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="货号" min-width="110">
+          <template #default="scope">
+            <el-input v-if="!isReadonly" v-model="scope.row.catNo" size="small" placeholder="货号" />
+            <span v-else>{{ scope.row.catNo || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="规格/浓度" min-width="110">
+          <template #default="scope">
+            <el-input v-if="!isReadonly" v-model="scope.row.content" size="small" placeholder="规格/浓度" />
+            <span v-else>{{ scope.row.content || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="批号" min-width="120">
+          <template #default="scope">
+            <el-input v-if="!isReadonly" v-model="scope.row.lotNo" size="small" placeholder="批号" />
+            <span v-else>{{ scope.row.lotNo || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="储存温度" min-width="150">
           <template #default="scope">
             <el-select
               v-if="!isReadonly"
-              v-model="scope.row.lotNo"
-              filterable
+              v-model="scope.row.storageTemp"
+              placeholder="储存温度"
               clearable
-              placeholder="选择批号"
-              :disabled="!scope.row.basId"
-              @change="(val: string) => onLotChange(val, scope.$index)"
+              filterable
+              allow-create
+              default-first-option
+              size="small"
+              style="width: 100%"
             >
               <el-option
-                v-for="lot in getLotOptions(scope.row.basId)"
-                :key="lot.lotNo"
-                :label="lot.lotNo"
-                :value="lot.lotNo"
+                v-for="dict in getStrDictOptions(DICT_TYPE.REAGENT_STORAGE_CONDITION)"
+                :key="dict.value"
+                :label="dict.label"
+                :value="dict.value"
               />
             </el-select>
-            <span v-else>{{ scope.row.lotNo }}</span>
+            <span v-else>{{ scope.row.storageTemp || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="储存位置" min-width="130">
+          <template #default="scope">
+            <el-input v-if="!isReadonly" v-model="scope.row.storageLocation" size="small" placeholder="储存位置" />
+            <span v-else>{{ scope.row.storageLocation || '-' }}</span>
           </template>
         </el-table-column>
         <el-table-column label="需求数量" width="110">
@@ -108,9 +129,18 @@
             <span v-else>{{ scope.row.requestedQty }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="过期日期" width="140">
+        <el-table-column label="过期日期" width="150">
           <template #default="scope">
-            <span v-if="scope.row.expirationDate">{{ formatDate(scope.row.expirationDate) }}</span>
+            <el-date-picker
+              v-if="!isReadonly"
+              v-model="scope.row.expirationDate"
+              type="date"
+              value-format="x"
+              size="small"
+              placeholder="过期日期"
+              style="width: 100%"
+            />
+            <span v-else-if="scope.row.expirationDate">{{ formatDate(scope.row.expirationDate) }}</span>
             <span v-else>-</span>
           </template>
         </el-table-column>
@@ -384,12 +414,76 @@
         </div>
       </div>
     </template>
+
+    <!-- ============ 选择试剂批号弹窗（老ERP同步扁平表，一行=一批，分页 + 双击确定） ============ -->
+    <el-dialog v-model="flatPickerVisible" title="选择试剂批号" width="1000px" top="6vh" append-to-body>
+      <el-form :inline="true" @submit.prevent>
+        <el-form-item label="关键词">
+          <el-input
+            v-model="flatKeyword"
+            placeholder="试剂名称 / 编号 / BAS号 / 货号"
+            clearable
+            class="!w-320px"
+            @keyup.enter="onFlatSearch"
+            @clear="onFlatSearch"
+          >
+            <template #prefix><Icon icon="ep:search" /></template>
+          </el-input>
+        </el-form-item>
+        <el-form-item>
+          <el-button type="primary" @click="onFlatSearch"><Icon icon="ep:search" />搜索</el-button>
+          <el-button @click="resetFlatSearch">重置</el-button>
+        </el-form-item>
+        <el-form-item class="!mb-0">
+          <span class="text-gray-400 text-12px">点击选中一行，双击直接确定</span>
+        </el-form-item>
+      </el-form>
+      <el-table
+        v-loading="flatLoading"
+        :data="flatList"
+        height="380"
+        border
+        highlight-current-row
+        @current-change="flatCurrent = $event"
+        @row-dblclick="confirmFlatPick"
+      >
+        <el-table-column type="index" label="#" width="46" align="center" />
+        <el-table-column label="BAS号" prop="basId" width="130" show-overflow-tooltip />
+        <el-table-column label="仓库" prop="warehouse" width="120" show-overflow-tooltip />
+        <el-table-column label="试剂名称" prop="reagentName" min-width="170" show-overflow-tooltip />
+        <el-table-column label="试剂编号" prop="reagentCode" width="110" show-overflow-tooltip />
+        <el-table-column label="货号" prop="catNo" width="110" show-overflow-tooltip />
+        <el-table-column label="规格" prop="spec" width="140" show-overflow-tooltip />
+        <el-table-column label="批号" prop="lotNo" width="120" show-overflow-tooltip />
+        <el-table-column label="参考剩余量" prop="amountLeft" width="100" align="right" />
+        <el-table-column label="储存温度" prop="storageTemp" width="90" />
+        <el-table-column label="过期日期" width="110">
+          <template #default="scope">
+            <span>{{ scope.row.expireDate || '-' }}</span>
+          </template>
+        </el-table-column>
+      </el-table>
+      <div class="mt-8px" style="display: flex; justify-content: space-between; align-items: center">
+        <span class="text-gray-400 text-12px">共 {{ flatTotal }} 条</span>
+        <Pagination
+          v-model:limit="flatQuery.pageSize"
+          v-model:page="flatQuery.pageNo"
+          :total="flatTotal"
+          @pagination="onFlatSearch"
+        />
+      </div>
+      <template #footer>
+        <el-button type="primary" :disabled="!flatCurrent" @click="confirmFlatPick">确 定</el-button>
+        <el-button @click="flatPickerVisible = false">取 消</el-button>
+      </template>
+    </el-dialog>
   </el-dialog>
 </template>
 
 <script lang="ts" setup>
 import * as ReagentApi from '@/api/reagent/index'
 import { formatDate } from '@/utils/formatTime'
+import { DICT_TYPE, getStrDictOptions } from '@/utils/dict'
 import { nextTick } from 'vue'
 
 defineOptions({ name: 'ReagentDeliveryForm' })
@@ -550,61 +644,80 @@ const saveLogistics = async (row: any) => {
   }
 }
 
-// ==================== 试剂下拉选项 & 批号缓存 ====================
-const reagentOptions = ref<ReagentApi.ReagentBaseVO[]>([])
-const lotCache = ref<Record<string, ReagentApi.ReagentBaseLotVO[]>>({})
+// ==================== 选批号弹窗（老ERP同步扁平表，一行=一批，分页） ====================
+const flatList = ref<ReagentApi.ReagentBaseFlatVO[]>([])
+const flatTotal = ref(0)
+const flatLoading = ref(false)
+const flatPickerVisible = ref(false)
+const flatPickerIndex = ref(-1)
+const flatKeyword = ref('')
+const flatCurrent = ref<ReagentApi.ReagentBaseFlatVO | null>(null)
+const flatQuery = reactive({ pageNo: 1, pageSize: 10 })
 
-const loadReagentOptions = async () => {
+// 打开弹窗（默认加载第一页）
+const openFlatPicker = (index: number) => {
+  flatPickerIndex.value = index
+  flatKeyword.value = ''
+  flatCurrent.value = null
+  flatList.value = []
+  flatTotal.value = 0
+  flatQuery.pageNo = 1
+  flatPickerVisible.value = true
+  onFlatSearch()
+}
+
+// 搜索/翻页（试剂名称/编号/BAS号/货号）
+const onFlatSearch = async () => {
+  flatLoading.value = true
   try {
-    reagentOptions.value = await ReagentApi.getBaseSimpleList()
-  } catch {
-    // ignore
-  }
-}
-
-const getLotOptions = (basId: string) => {
-  if (!basId || !lotCache.value[basId]) return []
-  return lotCache.value[basId]
-}
-
-// 选择试剂 → 加载批号
-const onReagentChange = async (basId: string, index: number) => {
-  const item = formData.items![index]
-  // 找到对应的试剂信息填充名称和货号
-  const reagent = reagentOptions.value.find((r) => r.basId === basId)
-  if (reagent) {
-    item.reagentName = reagent.reagentName
-    item.catNo = reagent.catNo || ''
-    item.storageTemp = reagent.storageTemp || ''
-    item.storageLocation = reagent.storageLocation || ''
-  }
-  // 清空批号、过期日期、规格/浓度
-  item.lotNo = ''
-  item.expirationDate = ''
-  item.content = ''
-
-  // 加载批号
-  if (basId && !lotCache.value[basId]) {
-    try {
-      const allLots = await ReagentApi.getLotListByBasId(basId)
-      lotCache.value[basId] = allLots.filter((l: any) => l.status !== 1) // 仅正常批号
-    } catch {
-      lotCache.value[basId] = []
+    const data = await ReagentApi.getBaseFlatSimpleList({
+      keyword: flatKeyword.value,
+      pageNo: flatQuery.pageNo,
+      pageSize: flatQuery.pageSize
+    })
+    flatList.value = data.list || []
+    flatTotal.value = data.total || 0
+    // 选中项不在当前页时清掉，避免误确定
+    if (flatCurrent.value && !flatList.value.find((x) => x.id === flatCurrent.value!.id)) {
+      flatCurrent.value = null
     }
+  } catch {
+    flatList.value = []
+    flatTotal.value = 0
+  } finally {
+    flatLoading.value = false
   }
 }
 
-// 选择批号 → 联动过期日期（只读锁定）
-const onLotChange = (lotNo: string, index: number) => {
-  const item = formData.items![index]
-  if (!lotNo || !item.basId) {
-    item.expirationDate = ''
-    return
-  }
-  const lots = lotCache.value[item.basId] || []
-  const lot = lots.find((l) => l.lotNo === lotNo)
-  item.expirationDate = lot?.expirationDate || ''
-  item.content = lot?.content || ''
+const resetFlatSearch = () => {
+  flatKeyword.value = ''
+  flatQuery.pageNo = 1
+  onFlatSearch()
+}
+
+// 确认选择 → 自动带出整行信息
+const confirmFlatPick = () => {
+  const b = flatCurrent.value
+  if (!b || flatPickerIndex.value < 0) return
+  const item = formData.items![flatPickerIndex.value]
+  item.basId = b.reagentCode || '' // 试剂编号 = 材料编号
+  item.reagentName = b.reagentName || ''
+  item.catNo = b.catNo || ''
+  item.content = b.spec || '' // 规格/浓度
+  item.lotNo = b.lotNo || ''
+  item.storageTemp = b.storageTemp || ''
+  item.storageLocation = b.storageLocation || ''
+  item.expirationDate = flatExpireToMillis(b.expireDate)
+  flatPickerVisible.value = false
+}
+
+// 过期日期字符串 → 毫秒（后端 LocalDateTime 接收，兼容 2026-01-01 / 2026/01/01 00:00:00）
+const flatExpireToMillis = (s?: string): string => {
+  if (!s) return ''
+  const v = String(s).trim().replace(/\//g, '-')
+  const norm = v.length >= 10 ? v.slice(0, 10) + (v.length > 10 ? 'T' + v.slice(11).trim() : 'T00:00:00') : v
+  const t = new Date(norm)
+  return isNaN(t.getTime()) ? '' : String(t.getTime())
 }
 
 // ==================== 明细行操作 ====================
@@ -669,8 +782,7 @@ const open = async (m: string, id?: number) => {
   // 收发信息：仅新增模式默认展开，其他模式默认折叠
   showAddress.value = m === 'create'
 
-  // 加载试剂下拉
-  await loadReagentOptions()
+  // 批号选择为远程搜索，无需预加载
 
   // 重置表单
   Object.assign(formData, {
@@ -698,16 +810,8 @@ const open = async (m: string, id?: number) => {
       const data = await ReagentApi.getApplyDetail(id)
       Object.assign(formData, data)
       formData.items = data.items || []  // 显式赋值保证明细 reactivity
-      // 预加载所有批号缓存
+      // 批号选择为弹窗（扁平表），无需预加载；为 ship 模式添加临时的 _shipQty 字段
       for (const item of data.items || []) {
-        if (item.basId && !lotCache.value[item.basId]) {
-          try {
-            lotCache.value[item.basId] = await ReagentApi.getLotListByBasId(item.basId)
-          } catch {
-            lotCache.value[item.basId] = []
-          }
-        }
-        // 为 ship 模式添加临时的 _shipQty 字段
         ;(item as any)._shipQty = 0
       }
     } catch {

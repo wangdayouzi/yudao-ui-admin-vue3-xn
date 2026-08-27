@@ -2,28 +2,27 @@ import request from '@/config/axios'
 
 // ==================== TypeScript 类型定义 ====================
 
-/** 试剂主表 */
-export interface ReagentBaseVO {
+/** 试剂基础数据(扁平，老ERP同步，一行=一批) */
+export interface ReagentBaseFlatVO {
   id?: number
-  basId: string
-  reagentName: string
+  basId?: string
+  reagentCode?: string
+  reagentName?: string
   vendor?: string
+  warehouse?: string
   catNo?: string
-  storageTemp?: string
-  storageLocation?: string
-  status: number
-  createTime?: string
-}
-
-/** 试剂批号 */
-export interface ReagentBaseLotVO {
-  id?: number
-  baseId: number
-  lotNo: string
-  content?: string
-  expirationDate?: string
+  spec?: string
+  lotNo?: string
+  expireDate?: string
   amountLeft?: string
+  storageLocation?: string
+  storageTemp?: string
+  itemCategory?: string
+  categoryKey?: string
+  srcLineId?: string
+  srcReceiptId?: string
   status?: number
+  syncTime?: string
 }
 
 /** 申请单 */
@@ -88,52 +87,22 @@ export interface ReagentShipmentItemVO {
   quantityShipped: number
 }
 
-// ==================== 试剂基础数据 API ====================
+// ==================== 试剂基础数据(扁平, 老ERP同步) API ====================
 
-export const getBasePage = (params: any) => {
-  return request.get({ url: '/reagent/base/page', params })
+export const getBaseFlatPage = (params: any) => {
+  return request.get({ url: '/reagent/base-flat/page', params })
 }
 
-export const getBaseSimpleList = () => {
-  return request.get({ url: '/reagent/base/simple-list' })
+export const updateBaseFlat = (data: ReagentBaseFlatVO) => {
+  return request.put({ url: '/reagent/base-flat/update', data })
 }
 
-export const getBaseDetail = (id: number) => {
-  return request.get({ url: '/reagent/base/get', params: { id } })
+export const getBaseFlatSimpleList = (params: any) => {
+  return request.get({ url: '/reagent/base-flat/simple-list', params })
 }
 
-export const createBase = (data: ReagentBaseVO) => {
-  return request.post({ url: '/reagent/base/create', data })
-}
-
-export const updateBase = (data: ReagentBaseVO) => {
-  return request.put({ url: '/reagent/base/update', data })
-}
-
-export const deleteBase = (id: number) => {
-  return request.delete({ url: '/reagent/base/delete', params: { id } })
-}
-
-// ==================== 试剂批号 API ====================
-
-export const getLotListByBaseId = (baseId: number) => {
-  return request.get({ url: '/reagent/base/lot/list-by-base-id', params: { baseId } })
-}
-
-export const getLotListByBasId = (basId: string) => {
-  return request.get({ url: '/reagent/base/lot/list-by-bas-id', params: { basId } })
-}
-
-export const createLot = (data: ReagentBaseLotVO) => {
-  return request.post({ url: '/reagent/base/lot/create', data })
-}
-
-export const updateLot = (data: ReagentBaseLotVO) => {
-  return request.put({ url: '/reagent/base/lot/update', data })
-}
-
-export const deleteLot = (id: number) => {
-  return request.delete({ url: '/reagent/base/lot/delete', params: { id } })
+export const deleteBaseFlat = (id: number) => {
+  return request.delete({ url: '/reagent/base-flat/delete', params: { id } })
 }
 
 // ==================== 申请单 API ====================

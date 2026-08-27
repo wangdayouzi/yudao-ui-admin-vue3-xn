@@ -18,7 +18,8 @@
         />
       </el-form-item>
       <el-form-item label="处理器的参数" prop="handlerParam">
-        <el-input v-model="formData.handlerParam" placeholder="请输入处理器的参数" />
+        <el-input v-model="formData.handlerParam" :placeholder="handlerParamPlaceholder" />
+        <div v-if="handlerParamHint" class="param-hint">{{ handlerParamHint }}</div>
       </el-form-item>
       <el-form-item label="CRON 表达式" prop="cronExpression">
         <crontab v-model="formData.cronExpression" />
@@ -134,4 +135,39 @@ const resetForm = () => {
   }
   formRef.value?.resetFields()
 }
+
+/**
+ * ERP 同步/推送任务的参数提示（按处理器名字动态切换）
+ */
+const handlerParamPlaceholder = computed(() => {
+  const h = formData.value.handlerName
+  if (h === 'erpSyncJob') return '如 60:60（分段回填）或 2023-04-01~2023-08-31（日期范围）'
+  if (h === 'erpPushJob') return '如 5000（每类处理行数，可留空用默认 1000）'
+  return '请输入处理器的参数'
+})
+const handlerParamHint = computed(() => {
+  const h = formData.value.handlerName
+  if (h === 'erpSyncJob') {
+    return 'erpSyncJob 参数格式：\n' +
+      '· N —— 回溯 N 天（默认 1，只拉今天）\n' +
+      '· N:offset —— 分段回填：每段 N 天，终点=今天往前 offset 天。如 60:0=最近60天，60:60=往前第2段，逐段往前可覆盖全部历史（老库脆时最稳）\n' +
+      '· begin~end —— 显式日期范围，如 2023-04-01~2023-08-31\n' +
+      '每次同步会自动把 入库/领料/退料/退货/分类 一起拉取。'
+  }
+  if (h === 'erpPushJob') {
+    return 'erpPushJob 参数：每类处理行数（默认 1000，0=1000）。\n' +
+      '每次按 分类/入库/领料/退料/退货 各处理一批，多跑几轮，直到 staging 各表未推送数=0。'
+  }
+  return ''
+})
 </script>
+
+<style scoped>
+.param-hint {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  line-height: 1.7;
+  margin-top: 4px;
+  white-space: pre-line;
+}
+</style>

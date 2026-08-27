@@ -27,7 +27,6 @@
     :props="treeProps"
     :expand-on-click-node="false"
     :filter-node-method="filterNode"
-    default-expand-all
     highlight-current
     node-key="id"
     @node-click="handleNodeClick"
@@ -82,6 +81,10 @@ const handleNodeClick = (data: MdItemTypeVO) => {
 const loadTree = async () => {
   const list = await MdItemTypeApi.getItemTypeSimpleList()
   treeData.value = handleTree(list)
+  // 只默认展开第一级（顶级分类），分类太多时避免全部展开；搜索过滤时会自动展开命中项
+  nextTick(() => {
+    treeRef.value?.setExpandedKeys(treeData.value.map((n) => n.id))
+  })
 }
 
 onMounted(() => {
