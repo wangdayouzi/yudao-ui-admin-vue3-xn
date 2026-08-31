@@ -9,6 +9,7 @@ export interface ReagentBaseFlatVO {
   reagentCode?: string
   reagentName?: string
   vendor?: string
+  brand?: string
   warehouse?: string
   catNo?: string
   spec?: string
@@ -53,13 +54,16 @@ export interface ReagentApplyVO {
 export interface ReagentApplyItemVO {
   id?: number
   basId: string
+  basNo?: string // BAS号/采购入库单号 pm02603
   reagentName: string
+  vendor?: string // 供应商
+  brand?: string // 品牌
   catNo?: string
   content?: string
   lotNo?: string
   storageTemp?: string
   storageLocation?: string
-  expirationDate?: string
+  expirationDate?: number | '' // 过期日期（el-date-picker value-format=x，毫秒数或空）
   requestedQty: number
   shippedQtyTotal?: number
 }
@@ -103,6 +107,11 @@ export const getBaseFlatSimpleList = (params: any) => {
 
 export const deleteBaseFlat = (id: number) => {
   return request.delete({ url: '/reagent/base-flat/delete', params: { id } })
+}
+
+// 生成生物试剂接收单（docx）
+export const generateBaseReceipt = (data: any) => {
+  return request.postOriginal({ url: '/reagent/base-flat/generate-receipt', data, responseType: 'blob' })
 }
 
 // ==================== 申请单 API ====================

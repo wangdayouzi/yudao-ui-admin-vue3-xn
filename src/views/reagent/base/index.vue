@@ -18,6 +18,15 @@
         <el-form-item label="分类" prop="itemCategory">
           <el-input v-model="queryParams.itemCategory" placeholder="分类名" clearable @keyup.enter="handleQuery" class="!w-180px" />
         </el-form-item>
+        <el-form-item label="仓库" prop="warehouse">
+          <el-input v-model="queryParams.warehouse" placeholder="仓库名称，模糊匹配" clearable @keyup.enter="handleQuery" class="!w-160px" />
+        </el-form-item>
+        <el-form-item label="供应商" prop="vendor">
+          <el-input v-model="queryParams.vendor" placeholder="供应商，模糊匹配" clearable @keyup.enter="handleQuery" class="!w-160px" />
+        </el-form-item>
+        <el-form-item label="品牌">
+          <el-input v-model="queryParams.brand" placeholder="品牌，模糊匹配" clearable @keyup.enter="handleQuery" class="!w-160px" />
+        </el-form-item>
         <el-form-item>
           <el-button type="primary" @click="handleQuery">
             <Icon icon="ep:search" />搜索
@@ -47,6 +56,7 @@
         <el-table-column v-if="columnMap.reagentCode" label="试剂编号" prop="reagentCode" width="120" show-overflow-tooltip />
         <el-table-column v-if="columnMap.reagentName" label="试剂名称" prop="reagentName" min-width="180" show-overflow-tooltip />
         <el-table-column v-if="columnMap.vendor" label="供应商" prop="vendor" width="150" show-overflow-tooltip />
+        <el-table-column v-if="columnMap.brand" label="品牌" prop="brand" width="130" show-overflow-tooltip />
         <el-table-column v-if="columnMap.warehouse" label="仓库" prop="warehouse" width="130" show-overflow-tooltip />
         <el-table-column v-if="columnMap.catNo" label="货号" prop="catNo" width="120" show-overflow-tooltip />
         <el-table-column v-if="columnMap.spec" label="规格" prop="spec" width="160" show-overflow-tooltip />
@@ -56,8 +66,11 @@
         <el-table-column v-if="columnMap.storageLocation" label="存储位置" prop="storageLocation" width="140" show-overflow-tooltip />
         <el-table-column v-if="columnMap.storageTemp" label="储存温度" prop="storageTemp" width="100" />
         <el-table-column v-if="columnMap.itemCategory" label="分类" prop="itemCategory" min-width="180" show-overflow-tooltip />
-        <el-table-column label="操作" width="130" fixed="right">
+        <el-table-column label="操作" width="175" fixed="right">
           <template #default="scope">
+            <el-button v-hasPermi="['reagent:base:query']" link type="success" @click.stop="openReceiptForm(scope.row)">
+              接收单
+            </el-button>
             <el-button v-hasPermi="['reagent:base:update']" link type="primary" @click.stop="openEditForm(scope.row)">
               编辑
             </el-button>
@@ -93,6 +106,9 @@
         </el-form-item>
         <el-form-item label="供应商" prop="vendor">
           <el-input v-model="editForm.vendor" />
+        </el-form-item>
+        <el-form-item label="品牌" prop="brand">
+          <el-input v-model="editForm.brand" />
         </el-form-item>
         <el-form-item label="仓库" prop="warehouse">
           <el-input v-model="editForm.warehouse" />
@@ -139,12 +155,100 @@
         <el-button @click="editDialogVisible = false">取 消</el-button>
       </template>
     </el-dialog>
+
+    <!-- ============ 生物试剂接收单生成弹窗 ============ -->
+    <el-dialog v-model="receiptDialogVisible" title="生成生物试剂接收单" width="640px">
+      <el-form ref="receiptFormRef" v-loading="receiptLoading" :model="receiptForm" label-width="110px">
+        <el-row :gutter="12">
+          <el-col :span="12">
+            <el-form-item label="试剂名称" prop="name">
+              <el-input v-model="receiptForm.name" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="BAS编号" prop="basId">
+              <el-input v-model="receiptForm.basId" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="供应商" prop="vendor">
+              <el-input v-model="receiptForm.vendor" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="接收日期" prop="receiveDate">
+              <el-date-picker v-model="receiptForm.receiveDate" type="date" value-format="YYYY-MM-DD" placeholder="接收日期" style="width: 100%" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="试剂数量" prop="qty">
+              <el-input v-model="receiptForm.qty" placeholder="Number of reagent" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="单个容量" prop="contentPerUnit">
+              <el-input v-model="receiptForm.contentPerUnit" placeholder="Content/unit" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="批号" prop="lotNo">
+              <el-input v-model="receiptForm.lotNo" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="货号" prop="catNo">
+              <el-input v-model="receiptForm.catNo" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="储存位置" prop="storageLocation">
+              <el-input v-model="receiptForm.storageLocation" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="储存温度" prop="storageTemp">
+              <el-select
+                v-model="receiptForm.storageTemp"
+                placeholder="请选择储存温度"
+                clearable
+                filterable
+                allow-create
+                default-first-option
+                style="width: 100%"
+              >
+                <el-option
+                  v-for="dict in getStrDictOptions(DICT_TYPE.REAGENT_STORAGE_CONDITION)"
+                  :key="dict.value"
+                  :label="dict.label"
+                  :value="dict.value"
+                />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="过期日期" prop="expireDate">
+              <el-input v-model="receiptForm.expireDate" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="24">
+            <el-form-item label="说明" prop="comment">
+              <el-input v-model="receiptForm.comment" type="textarea" :rows="2" placeholder="Comment 说明" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+      </el-form>
+      <template #footer>
+        <el-button :loading="receiptLoading" type="primary" @click="handleGenerateReceipt">生成文件</el-button>
+        <el-button @click="receiptDialogVisible = false">取 消</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script lang="ts" setup>
 import * as ReagentApi from '@/api/reagent/index'
 import { DICT_TYPE, getStrDictOptions } from '@/utils/dict'
+import dayjs from 'dayjs'
 
 defineOptions({ name: 'ReagentBase' })
 
@@ -162,6 +266,9 @@ const queryParams = reactive({
   reagentName: '',
   catNo: '',
   itemCategory: '',
+  warehouse: '',
+  vendor: '',
+  brand: '',
   status: undefined as number | undefined
 })
 
@@ -182,6 +289,7 @@ const columnOptions = [
   { key: 'reagentCode', label: '试剂编号' },
   { key: 'reagentName', label: '试剂名称' },
   { key: 'vendor', label: '供应商' },
+  { key: 'brand', label: '品牌' },
   { key: 'warehouse', label: '仓库' },
   { key: 'catNo', label: '货号' },
   { key: 'spec', label: '规格' },
@@ -205,6 +313,9 @@ const resetQuery = () => {
   queryParams.reagentName = ''
   queryParams.catNo = ''
   queryParams.itemCategory = ''
+  queryParams.warehouse = ''
+  queryParams.vendor = ''
+  queryParams.brand = ''
   queryParams.status = undefined
   handleQuery()
 }
@@ -227,6 +338,7 @@ const openEditForm = (row: ReagentApi.ReagentBaseFlatVO) => {
     lotNo: row.lotNo,
     reagentName: row.reagentName,
     vendor: row.vendor,
+    brand: row.brand,
     warehouse: row.warehouse,
     catNo: row.catNo,
     spec: row.spec,
@@ -267,5 +379,70 @@ const handleDelete = async (row: ReagentApi.ReagentBaseFlatVO) => {
   } catch {
     message.error('删除失败')
   }
+}
+
+// ==================== 生物试剂接收单生成 ====================
+const receiptDialogVisible = ref(false)
+const receiptLoading = ref(false)
+
+/** 今天日期 YYYY-MM-DD */
+const today = () => dayjs().format('YYYY-MM-DD')
+
+const receiptForm = reactive({
+  name: '',
+  basId: '',
+  vendor: '',
+  receiveDate: '',
+  qty: '',
+  contentPerUnit: '',
+  lotNo: '',
+  catNo: '',
+  storageLocation: '',
+  storageTemp: '',
+  expireDate: '',
+  comment: ''
+})
+
+const openReceiptForm = (row: ReagentApi.ReagentBaseFlatVO) => {
+  Object.assign(receiptForm, {
+    name: row.reagentName || '',
+    basId: row.basId || '',
+    vendor: row.vendor || '',
+    receiveDate: today(),
+    qty: '',
+    contentPerUnit: '',
+    lotNo: row.lotNo || '',
+    catNo: row.catNo || '',
+    storageLocation: row.storageLocation || '',
+    storageTemp: row.storageTemp || '',
+    expireDate: row.expireDate || '',
+    comment: ''
+  })
+  receiptDialogVisible.value = true
+}
+
+const handleGenerateReceipt = async () => {
+  receiptLoading.value = true
+  try {
+    const res = await ReagentApi.generateBaseReceipt(receiptForm)
+    downloadBlob(res, `生物试剂接收单-${receiptForm.basId || 'reagent'}.docx`)
+    message.success('接收单生成完成')
+    receiptDialogVisible.value = false
+  } catch {
+    message.error('生成失败')
+  } finally {
+    receiptLoading.value = false
+  }
+}
+
+/** Blob 响应下载辅助 */
+const downloadBlob = (res: any, fileName: string) => {
+  const blob = res instanceof Blob ? res : new Blob([res.data ?? res])
+  const url = window.URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = fileName
+  a.click()
+  window.URL.revokeObjectURL(url)
 }
 </script>

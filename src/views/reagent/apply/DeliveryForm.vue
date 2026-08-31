@@ -63,6 +63,49 @@
             <span v-else>{{ scope.row.reagentName || '-' }}</span>
           </template>
         </el-table-column>
+        <el-table-column label="BAS号" min-width="130">
+          <template #default="scope">
+            <el-input v-if="!isReadonly" v-model="scope.row.basNo" size="small" placeholder="BAS/入库单号" />
+            <span v-else>{{ scope.row.basNo || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="需求数量" width="110">
+          <template #default="scope">
+            <el-input-number
+              v-if="!isReadonly"
+              v-model="scope.row.requestedQty"
+              :min="1"
+              size="small"
+              controls-position="right"
+              style="width: 100%"
+            />
+            <span v-else>{{ scope.row.requestedQty }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column v-if="mode === 'ship'" label="本次发货" width="110">
+          <template #default="scope">
+            <el-input-number
+              v-model="scope.row._shipQty"
+              :min="0"
+              :max="(scope.row.requestedQty || 0) - (scope.row.shippedQtyTotal || 0)"
+              size="small"
+              controls-position="right"
+              style="width: 100%"
+            />
+          </template>
+        </el-table-column>
+        <el-table-column label="供应商" min-width="130">
+          <template #default="scope">
+            <el-input v-if="!isReadonly" v-model="scope.row.vendor" size="small" placeholder="供应商" />
+            <span v-else>{{ scope.row.vendor || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="品牌" min-width="130">
+          <template #default="scope">
+            <el-input v-if="!isReadonly" v-model="scope.row.brand" size="small" placeholder="品牌" />
+            <span v-else>{{ scope.row.brand || '-' }}</span>
+          </template>
+        </el-table-column>
         <el-table-column label="试剂编号" min-width="120">
           <template #default="scope">
             <el-input v-if="!isReadonly" v-model="scope.row.basId" size="small" placeholder="试剂编号" />
@@ -116,19 +159,6 @@
             <span v-else>{{ scope.row.storageLocation || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="需求数量" width="110">
-          <template #default="scope">
-            <el-input-number
-              v-if="!isReadonly"
-              v-model="scope.row.requestedQty"
-              :min="1"
-              size="small"
-              controls-position="right"
-              style="width: 100%"
-            />
-            <span v-else>{{ scope.row.requestedQty }}</span>
-          </template>
-        </el-table-column>
         <el-table-column label="过期日期" width="150">
           <template #default="scope">
             <el-date-picker
@@ -147,18 +177,6 @@
         <el-table-column v-if="mode === 'ship'" label="已发数量" width="80">
           <template #default="scope">
             {{ scope.row.shippedQtyTotal || 0 }}
-          </template>
-        </el-table-column>
-        <el-table-column v-if="mode === 'ship'" label="本次发货" width="110">
-          <template #default="scope">
-            <el-input-number
-              v-model="scope.row._shipQty"
-              :min="0"
-              :max="(scope.row.requestedQty || 0) - (scope.row.shippedQtyTotal || 0)"
-              size="small"
-              controls-position="right"
-              style="width: 100%"
-            />
           </template>
         </el-table-column>
         <el-table-column label="备注" min-width="120">
@@ -187,7 +205,16 @@
           </el-col>
           <el-col :span="12">
             <el-form-item label="物流公司" prop="expressCompany">
-              <el-input v-model="logisticsForm.expressCompany" placeholder="如：顺丰速运" />
+              <el-select
+                v-model="logisticsForm.expressCompany"
+                placeholder="请选择或输入物流公司"
+                filterable
+                allow-create
+                default-first-option
+                style="width: 100%"
+              >
+                <el-option v-for="item in expressCompanyOptions" :key="item" :label="item" :value="item" />
+              </el-select>
             </el-form-item>
           </el-col>
         </el-row>
@@ -234,9 +261,20 @@
             </template>
           </el-table-column>
           <el-table-column label="发货单号" prop="shipmentNo" min-width="170" />
-          <el-table-column label="快递公司" min-width="130">
+          <el-table-column label="快递公司" min-width="150">
             <template #default="scope">
-              <el-input v-if="scope.row._editing" v-model="scope.row.expressCompany" size="small" placeholder="物流公司" />
+              <el-select
+                v-if="scope.row._editing"
+                v-model="scope.row.expressCompany"
+                size="small"
+                placeholder="物流公司"
+                filterable
+                allow-create
+                default-first-option
+                style="width: 100%"
+              >
+                <el-option v-for="item in expressCompanyOptions" :key="item" :label="item" :value="item" />
+              </el-select>
               <span v-else>{{ scope.row.expressCompany || '-' }}</span>
             </template>
           </el-table-column>
@@ -290,9 +328,20 @@
             </template>
           </el-table-column>
           <el-table-column label="发货单号" prop="shipmentNo" min-width="170" />
-          <el-table-column label="快递公司" min-width="130">
+          <el-table-column label="快递公司" min-width="150">
             <template #default="scope">
-              <el-input v-if="scope.row._editing" v-model="scope.row.expressCompany" size="small" placeholder="物流公司" />
+              <el-select
+                v-if="scope.row._editing"
+                v-model="scope.row.expressCompany"
+                size="small"
+                placeholder="物流公司"
+                filterable
+                allow-create
+                default-first-option
+                style="width: 100%"
+              >
+                <el-option v-for="item in expressCompanyOptions" :key="item" :label="item" :value="item" />
+              </el-select>
               <span v-else>{{ scope.row.expressCompany || '-' }}</span>
             </template>
           </el-table-column>
@@ -344,7 +393,17 @@
               </el-col>
               <el-col :span="12">
                 <el-form-item label="电话" prop="consignorPhone" class="mb-8px">
-                  <el-input v-model="formData.consignorPhone" :disabled="isReadonly" />
+                  <el-select
+                    v-model="formData.consignorPhone"
+                    :disabled="isReadonly"
+                    placeholder="请选择或输入电话"
+                    filterable
+                    allow-create
+                    default-first-option
+                    style="width: 100%"
+                  >
+                    <el-option v-for="opt in consignorPhoneOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
+                  </el-select>
                 </el-form-item>
               </el-col>
             </el-row>
@@ -416,7 +475,7 @@
     </template>
 
     <!-- ============ 选择试剂批号弹窗（老ERP同步扁平表，一行=一批，分页 + 双击确定） ============ -->
-    <el-dialog v-model="flatPickerVisible" title="选择试剂批号" width="1000px" top="6vh" append-to-body>
+    <el-dialog v-model="flatPickerVisible" title="选择试剂批号" width="1200px" top="4vh" append-to-body>
       <el-form :inline="true" @submit.prevent>
         <el-form-item label="关键词">
           <el-input
@@ -430,6 +489,16 @@
             <template #prefix><Icon icon="ep:search" /></template>
           </el-input>
         </el-form-item>
+        <el-form-item label="仓库">
+          <el-input
+            v-model="flatWarehouse"
+            placeholder="仓库名称，模糊匹配"
+            clearable
+            class="!w-160px"
+            @keyup.enter="onFlatSearch"
+            @clear="onFlatSearch"
+          />
+        </el-form-item>
         <el-form-item>
           <el-button type="primary" @click="onFlatSearch"><Icon icon="ep:search" />搜索</el-button>
           <el-button @click="resetFlatSearch">重置</el-button>
@@ -441,7 +510,7 @@
       <el-table
         v-loading="flatLoading"
         :data="flatList"
-        height="380"
+        height="520"
         border
         highlight-current-row
         @current-change="flatCurrent = $event"
@@ -451,6 +520,8 @@
         <el-table-column label="BAS号" prop="basId" width="130" show-overflow-tooltip />
         <el-table-column label="仓库" prop="warehouse" width="120" show-overflow-tooltip />
         <el-table-column label="试剂名称" prop="reagentName" min-width="170" show-overflow-tooltip />
+        <el-table-column label="供应商" prop="vendor" width="120" show-overflow-tooltip />
+        <el-table-column label="品牌" prop="brand" width="110" show-overflow-tooltip />
         <el-table-column label="试剂编号" prop="reagentCode" width="110" show-overflow-tooltip />
         <el-table-column label="货号" prop="catNo" width="110" show-overflow-tooltip />
         <el-table-column label="规格" prop="spec" width="140" show-overflow-tooltip />
@@ -512,30 +583,47 @@ const dialogTitle = computed(() => {
 
 const isReadonly = computed(() => mode.value === 'view' || mode.value === 'ship')
 
+// 发货方电话选项：按当前区域（上海/宁波）只显示本区域号码
+const consignorPhoneOptions = computed(() => {
+  const isNingbo =
+    (formData.consignorUnit || '').includes('宁波') ||
+    (formData.consignorAddress || '').includes('宁波')
+  if (isNingbo) {
+    return [
+      { label: '0574-87878472-821', value: '0574-87878472-821' },
+      { label: '+8618067448732', value: '+8618067448732' }
+    ]
+  }
+  return [
+    { label: '021-50833588-526', value: '021-50833588-526' },
+    { label: '+8618067446213', value: '+8618067446213' }
+  ]
+})
+
 // 发货方地址快速填充
 const fillConsignorShanghai = () => {
   Object.assign(formData, {
-    consignorUnit: '精翰生物',
-    consignorAddress: '上海市浦东新区张江高科技园区XXX号',
-    consignorName: '仓库管理员',
-    consignorPhone: '021-99998888'
+    consignorUnit: '上海精翰生物科技有限公司',
+    consignorAddress: '上海市浦东新区加枫路8号5楼',
+    consignorName: '样品管理组',
+    consignorPhone: '021-50833588-526'
   })
 }
 const fillConsignorNingbo = () => {
   Object.assign(formData, {
-    consignorUnit: '精翰生物',
-    consignorAddress: '宁波市杭州湾新区XXX号',
-    consignorName: '宁波仓管员',
-    consignorPhone: '0574-99998888'
+    consignorUnit: '宁波熙宁检测技术有限公司',
+    consignorAddress: '浙江省宁波市高新区聚贤路587弄科技大市场A5-8楼',
+    consignorName: '样品管理组',
+    consignorPhone: '0574-87878472-821'
   })
 }
 
 // ==================== 表单数据 ====================
 const formData = reactive<ReagentApi.ReagentApplyVO>({
-  consignorUnit: '精翰生物',
-  consignorAddress: '上海市浦东新区张江高科技园区XXX号',
-  consignorName: '仓库管理员',
-  consignorPhone: '021-99998888',
+  consignorUnit: '上海精翰生物科技有限公司',
+  consignorAddress: '上海市浦东新区加枫路8号5楼',
+  consignorName: '样品管理组',
+  consignorPhone: '021-50833588-526',
   receiverUnit: '',
   receiverAddress: '',
   receiverName: '',
@@ -553,12 +641,21 @@ const formRules = {
   receiverName: [{ required: true, message: '接收联系人不能为空', trigger: 'blur' }],
   receiverPhone: [
     { required: true, message: '接收联系电话不能为空', trigger: 'blur' },
-    { pattern: /^(1[3-9]\d{9}|\d{3,4}-\d{7,8}(-\d{1,6})?)$/, message: '请输入正确的手机号或座机号', trigger: 'blur' }
+    { pattern: /^(\+?86)?1[3-9]\d{9}$|^\d{3,4}-\d{7,8}(-\d{1,6})?$/, message: '请输入正确的手机号/座机号（支持+86或86开头手机号，座机可带分机）', trigger: 'blur' }
   ],
   consignorPhone: [
-    { pattern: /^(1[3-9]\d{9}|\d{3,4}-\d{7,8}(-\d{1,6})?)$/, message: '请输入正确的手机号或座机号', trigger: 'blur' }
+    { pattern: /^(\+?86)?1[3-9]\d{9}$|^\d{3,4}-\d{7,8}(-\d{1,6})?$/, message: '请输入正确的手机号/座机号（支持+86或86开头手机号，座机可带分机）', trigger: 'blur' }
   ]
 }
+
+// 物流公司下拉选项（常见快递/物流公司，含冷链与同城）
+const expressCompanyOptions = [
+  '顺丰速运', '顺丰冷运', '京东物流', '京东冷链', '中通快递', '圆通速递',
+  '申通快递', '韵达快递', '极兔速递', '百世快递', '菜鸟速递', '德邦快递',
+  '跨越速运', '邮政EMS', '中国邮政', '中邮速递', '天天快递', '宅急送',
+  '优速快递', '安能物流', '苏宁物流', '丹鸟', '丰网速运', '闪送',
+  '达达', '美团配送', 'DHL', 'FedEx联邦快递', 'UPS', 'TNT'
+]
 
 // 物流表单（仅 ship 模式）
 const logisticsForm = reactive({
@@ -651,6 +748,7 @@ const flatLoading = ref(false)
 const flatPickerVisible = ref(false)
 const flatPickerIndex = ref(-1)
 const flatKeyword = ref('')
+const flatWarehouse = ref('')
 const flatCurrent = ref<ReagentApi.ReagentBaseFlatVO | null>(null)
 const flatQuery = reactive({ pageNo: 1, pageSize: 10 })
 
@@ -658,6 +756,7 @@ const flatQuery = reactive({ pageNo: 1, pageSize: 10 })
 const openFlatPicker = (index: number) => {
   flatPickerIndex.value = index
   flatKeyword.value = ''
+  flatWarehouse.value = ''
   flatCurrent.value = null
   flatList.value = []
   flatTotal.value = 0
@@ -672,6 +771,7 @@ const onFlatSearch = async () => {
   try {
     const data = await ReagentApi.getBaseFlatSimpleList({
       keyword: flatKeyword.value,
+      warehouse: flatWarehouse.value,
       pageNo: flatQuery.pageNo,
       pageSize: flatQuery.pageSize
     })
@@ -691,6 +791,7 @@ const onFlatSearch = async () => {
 
 const resetFlatSearch = () => {
   flatKeyword.value = ''
+  flatWarehouse.value = ''
   flatQuery.pageNo = 1
   onFlatSearch()
 }
@@ -701,7 +802,10 @@ const confirmFlatPick = () => {
   if (!b || flatPickerIndex.value < 0) return
   const item = formData.items![flatPickerIndex.value]
   item.basId = b.reagentCode || '' // 试剂编号 = 材料编号
+  item.basNo = b.basId || '' // BAS号 = 采购入库单号
   item.reagentName = b.reagentName || ''
+  item.vendor = b.vendor || ''
+  item.brand = b.brand || ''
   item.catNo = b.catNo || ''
   item.content = b.spec || '' // 规格/浓度
   item.lotNo = b.lotNo || ''
@@ -712,19 +816,26 @@ const confirmFlatPick = () => {
 }
 
 // 过期日期字符串 → 毫秒（后端 LocalDateTime 接收，兼容 2026-01-01 / 2026/01/01 00:00:00）
-const flatExpireToMillis = (s?: string): string => {
+// 注意：el-date-picker value-format="x" 期望的是「数字」毫秒时间戳，
+// 传字符串会被 element-plus 内部 dayjs(date) 误解析（如 "1648742400000" → 1654-02-24）
+const flatExpireToMillis = (s?: string): number | '' => {
   if (!s) return ''
   const v = String(s).trim().replace(/\//g, '-')
+  // 占位/空值标记（TBD/NA/无/- 等）与 1970 老空值 → 空
+  if (/^(TBD|NA|N\/A|无|-)$/i.test(v) || v.startsWith('1970')) return ''
   const norm = v.length >= 10 ? v.slice(0, 10) + (v.length > 10 ? 'T' + v.slice(11).trim() : 'T00:00:00') : v
   const t = new Date(norm)
-  return isNaN(t.getTime()) ? '' : String(t.getTime())
+  return isNaN(t.getTime()) ? '' : t.getTime()
 }
 
 // ==================== 明细行操作 ====================
 const addItem = () => {
   const item = {
     basId: '',
+    basNo: '',
     reagentName: '',
+    vendor: '',
+    brand: '',
     catNo: '',
     content: '',
     lotNo: '',
@@ -787,10 +898,10 @@ const open = async (m: string, id?: number) => {
   // 重置表单
   Object.assign(formData, {
     id: undefined,
-    consignorUnit: '精翰生物',
-    consignorAddress: '上海市浦东新区张江高科技园区XXX号',
-    consignorName: '仓库管理员',
-    consignorPhone: '021-XXXXXXXX',
+    consignorUnit: '上海精翰生物科技有限公司',
+    consignorAddress: '上海市浦东新区加枫路8号5楼',
+    consignorName: '样品管理组',
+    consignorPhone: '021-50833588-526',
     receiverUnit: '',
     receiverAddress: '',
     receiverName: '',
