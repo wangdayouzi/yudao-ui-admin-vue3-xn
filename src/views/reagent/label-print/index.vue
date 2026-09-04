@@ -58,7 +58,14 @@
           <el-input v-model="printForm.batchNo" placeholder="可修改" />
         </el-form-item>
         <el-form-item label="存储条件" prop="storageCondition">
-          <el-select v-model="printForm.storageCondition" placeholder="请选择存储条件" clearable style="width: 100%">
+          <el-select
+            v-model="storageConditionArr"
+            placeholder="请选择存储条件（可多选）"
+            clearable
+            multiple
+            filterable
+            style="width: 100%"
+          >
             <el-option
               v-for="dict in getStrDictOptions(DICT_TYPE.REAGENT_STORAGE_CONDITION)"
               :key="dict.value"
@@ -197,6 +204,14 @@ const printForm = reactive({
   receiverName: '',
   receiveDate: '',
   remark: ''
+})
+
+/** 存储条件多选（值存 printForm.storageCondition，逗号拼接打印到标签） */
+const storageConditionArr = computed({
+  get: () => (printForm.storageCondition ? String(printForm.storageCondition).split(',').map((s: string) => s.trim()).filter(Boolean) : []),
+  set: (v: string[]) => {
+    printForm.storageCondition = v.join(',')
+  }
 })
 
 /** 今天日期 YYYY-MM-DD */

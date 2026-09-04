@@ -1,5 +1,5 @@
 <template>
-  <div v-if="!disabled" class="upload-file">
+  <div v-if="!disabled" class="upload-file" v-loading="isUploading">
     <el-upload
       ref="uploadRef"
       v-model:file-list="fileList"
@@ -94,6 +94,10 @@ const props = defineProps({
 const uploadList = ref<UploadUserFile[]>([])
 const fileList = ref<UploadUserFile[]>([])
 const uploadNumber = ref<number>(0)
+const isUploading = ref(false) // 上传中状态，用于显示遮罩
+watch(uploadNumber, (val: number) => {
+  isUploading.value = val > 0
+})
 
 const { uploadUrl, httpRequest } = useUpload(props.directory)
 
@@ -215,6 +219,11 @@ const emitUpdateModelValue = () => {
 }
 </script>
 <style lang="scss" scoped>
+.upload-file {
+  position: relative;
+  min-height: 32px;
+}
+
 .upload-file-uploader {
   margin-bottom: 5px;
 }

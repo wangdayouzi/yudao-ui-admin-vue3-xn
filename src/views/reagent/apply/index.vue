@@ -54,7 +54,7 @@
           </template>
         </el-table-column>
         <el-table-column :formatter="dateFormatter" align="center" label="创建时间" prop="createTime" width="170" />
-        <el-table-column label="创建人" prop="creator" width="100" />
+        <el-table-column label="创建人" prop="creatorName" width="100" />
         <el-table-column label="操作" width="280" fixed="right">
           <template #default="scope">
             <!-- 草稿/退回：可编辑、提交、删除 -->

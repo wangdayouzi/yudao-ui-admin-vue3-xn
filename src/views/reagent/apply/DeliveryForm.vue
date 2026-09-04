@@ -27,13 +27,31 @@
             </el-form-item>
           </el-col>
           <el-col :span="8">
-            <el-form-item label="运输温度">
+            <el-form-item label="运输温度" prop="transportTemp">
               <el-input v-model="formData.transportTemp" placeholder="如：2-8°C" :disabled="isReadonly" />
             </el-form-item>
           </el-col>
           <el-col :span="8">
             <el-form-item label="温度记录仪">
               <el-switch v-model="formData.hasTempLogger" :active-value="1" :inactive-value="0" active-text="是" inactive-text="否" :disabled="isReadonly" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="计划运出日期" prop="plannedShipDate">
+              <el-date-picker
+                v-if="!isReadonly"
+                v-model="formData.plannedShipDate"
+                type="date"
+                value-format="x"
+                placeholder="选择计划运出日期"
+                style="width: 100%"
+              />
+              <span v-else>{{ formData.plannedShipDate ? formatDate(formData.plannedShipDate) : '-' }}</span>
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="备注" prop="note">
+              <el-input v-model="formData.note" placeholder="备注（选填）" :disabled="isReadonly" />
             </el-form-item>
           </el-col>
         </el-row>
@@ -130,13 +148,14 @@
             <span v-else>{{ scope.row.lotNo || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="储存温度" min-width="150">
+        <el-table-column label="储存温度" min-width="220">
           <template #default="scope">
             <el-select
               v-if="!isReadonly"
-              v-model="scope.row.storageTemp"
-              placeholder="储存温度"
+              v-model="scope.row.storageTempArr"
+              placeholder="储存温度（可多选）"
               clearable
+              multiple
               filterable
               allow-create
               default-first-option
@@ -249,12 +268,27 @@
               <div v-loading="sh._loading" style="width: 100%; overflow-x: auto">
                 <el-table :data="sh._items" border size="small" empty-text="暂无明细">
                   <el-table-column label="试剂名称" prop="reagentName" min-width="160" />
-                  <el-table-column label="试剂编号" prop="basId" min-width="100" />
+                  <el-table-column label="BAS号" min-width="140" show-overflow-tooltip>
+                    <template #default="scope">{{ scope.row.basNo || '-' }}</template>
+                  </el-table-column>
+                  <el-table-column label="需求数量" width="90">
+                    <template #default="scope">{{ scope.row.requestedQty ?? '-' }}</template>
+                  </el-table-column>
+                  <el-table-column label="供应商" min-width="130" show-overflow-tooltip>
+                    <template #default="scope">{{ scope.row.vendor || '-' }}</template>
+                  </el-table-column>
+                  <el-table-column label="品牌" min-width="110" show-overflow-tooltip>
+                    <template #default="scope">{{ scope.row.brand || '-' }}</template>
+                  </el-table-column>
+                  <el-table-column label="试剂编号" prop="basId" min-width="110" />
                   <el-table-column label="货号" prop="catNo" min-width="100" />
                   <el-table-column label="规格/浓度" prop="content" min-width="90" />
-                  <el-table-column label="储存温度" prop="storageTemp" min-width="90" />
+                  <el-table-column label="批号" prop="lotNo" min-width="110" />
+                  <el-table-column label="储存温度" prop="storageTemp" min-width="120" />
                   <el-table-column label="储存位置" prop="storageLocation" min-width="120" />
-                  <el-table-column label="批号" prop="lotNo" min-width="100" />
+                  <el-table-column label="过期日期" width="110">
+                    <template #default="scope">{{ scope.row.expirationDate ? formatDate(scope.row.expirationDate) : '-' }}</template>
+                  </el-table-column>
                   <el-table-column label="发货数量" prop="quantityShipped" min-width="80" />
                 </el-table>
               </div>
@@ -316,12 +350,27 @@
               <div v-loading="sh._loading" style="width: 100%; overflow-x: auto">
                 <el-table :data="sh._items" border size="small" empty-text="暂无明细">
                   <el-table-column label="试剂名称" prop="reagentName" min-width="160" />
-                  <el-table-column label="试剂编号" prop="basId" min-width="100" />
+                  <el-table-column label="BAS号" min-width="140" show-overflow-tooltip>
+                    <template #default="scope">{{ scope.row.basNo || '-' }}</template>
+                  </el-table-column>
+                  <el-table-column label="需求数量" width="90">
+                    <template #default="scope">{{ scope.row.requestedQty ?? '-' }}</template>
+                  </el-table-column>
+                  <el-table-column label="供应商" min-width="130" show-overflow-tooltip>
+                    <template #default="scope">{{ scope.row.vendor || '-' }}</template>
+                  </el-table-column>
+                  <el-table-column label="品牌" min-width="110" show-overflow-tooltip>
+                    <template #default="scope">{{ scope.row.brand || '-' }}</template>
+                  </el-table-column>
+                  <el-table-column label="试剂编号" prop="basId" min-width="110" />
                   <el-table-column label="货号" prop="catNo" min-width="100" />
                   <el-table-column label="规格/浓度" prop="content" min-width="90" />
-                  <el-table-column label="储存温度" prop="storageTemp" min-width="90" />
+                  <el-table-column label="批号" prop="lotNo" min-width="110" />
+                  <el-table-column label="储存温度" prop="storageTemp" min-width="120" />
                   <el-table-column label="储存位置" prop="storageLocation" min-width="120" />
-                  <el-table-column label="批号" prop="lotNo" min-width="100" />
+                  <el-table-column label="过期日期" width="110">
+                    <template #default="scope">{{ scope.row.expirationDate ? formatDate(scope.row.expirationDate) : '-' }}</template>
+                  </el-table-column>
                   <el-table-column label="发货数量" prop="quantityShipped" min-width="80" />
                 </el-table>
               </div>
@@ -372,7 +421,7 @@
       <!-- ==================== 收货/发货信息区块 ==================== -->
       <el-divider content-position="left">
         收发信息
-        <el-button size="small" type="primary" link @click="showAddress = !showAddress">
+        <el-button v-if="mode !== 'edit'" size="small" type="primary" link @click="showAddress = !showAddress">
           {{ showAddress ? '收起' : '展开' }}
         </el-button>
       </el-divider>
@@ -382,8 +431,21 @@
           <fieldset style="border: 1px solid #dcdfe6; border-radius: 4px; padding: 8px 12px">
             <legend style="font-weight: bold; color: #409eff">
               发货方信息
-              <el-button v-if="!isReadonly" size="small" type="warning" style="margin-left: 8px" @click="fillConsignorShanghai">上海地址</el-button>
-              <el-button v-if="!isReadonly" size="small" type="success" @click="fillConsignorNingbo">宁波地址</el-button>
+              <el-button
+                v-if="!isReadonly"
+                size="small"
+                :type="formData.region === '上海' ? 'warning' : 'info'"
+                :plain="formData.region !== '上海'"
+                style="margin-left: 8px"
+                @click="fillConsignorShanghai"
+              >{{ formData.region === '上海' ? '✓ ' : '' }}上海地址</el-button>
+              <el-button
+                v-if="!isReadonly"
+                size="small"
+                :type="formData.region === '宁波' ? 'success' : 'info'"
+                :plain="formData.region !== '宁波'"
+                @click="fillConsignorNingbo"
+              >{{ formData.region === '宁波' ? '✓ ' : '' }}宁波地址</el-button>
             </legend>
             <el-row :gutter="12">
               <el-col :span="12">
@@ -462,6 +524,9 @@
           <template v-if="mode === 'create' || mode === 'edit'">
             <el-button type="primary" :loading="formLoading" @click="handleSave">
               保存草稿
+            </el-button>
+            <el-button type="success" :loading="formLoading" @click="handleSaveAndSubmit">
+              保存并提交
             </el-button>
           </template>
           <!-- 样品组：确认发货按钮 -->
@@ -595,35 +660,37 @@ const consignorPhoneOptions = computed(() => {
     ]
   }
   return [
-    { label: '021-50833588-526', value: '021-50833588-526' },
-    { label: '+8618067446213', value: '+8618067446213' }
+    { label: '18117369294', value: '18117369294' }
   ]
 })
 
 // 发货方地址快速填充
 const fillConsignorShanghai = () => {
+  formData.region = '上海'
   Object.assign(formData, {
     consignorUnit: '上海精翰生物科技有限公司',
-    consignorAddress: '上海市浦东新区加枫路8号5楼',
-    consignorName: '样品管理组',
-    consignorPhone: '021-50833588-526'
+    consignorAddress: '上海市浦东新区(上海)自由贸易试验区加枫路8号7层A32',
+    consignorName: '精翰样品管理组',
+    consignorPhone: '18117369294'
   })
 }
 const fillConsignorNingbo = () => {
+  formData.region = '宁波'
   Object.assign(formData, {
     consignorUnit: '宁波熙宁检测技术有限公司',
     consignorAddress: '浙江省宁波市高新区聚贤路587弄科技大市场A5-8楼',
-    consignorName: '样品管理组',
+    consignorName: '宁波样品管理组',
     consignorPhone: '0574-87878472-821'
   })
 }
 
 // ==================== 表单数据 ====================
 const formData = reactive<ReagentApi.ReagentApplyVO>({
-  consignorUnit: '上海精翰生物科技有限公司',
-  consignorAddress: '上海市浦东新区加枫路8号5楼',
-  consignorName: '样品管理组',
-  consignorPhone: '021-50833588-526',
+  consignorUnit: '',
+  consignorAddress: '',
+  consignorName: '',
+  consignorPhone: '',
+  region: '',
   receiverUnit: '',
   receiverAddress: '',
   receiverName: '',
@@ -632,10 +699,15 @@ const formData = reactive<ReagentApi.ReagentApplyVO>({
   projectNo: '',
   transportTemp: '',
   hasTempLogger: 0,
+  plannedShipDate: '',
+  note: '',
   items: []
 })
 
 const formRules = {
+  region: [{ required: true, message: '请选择发货区域（上海/宁波）', trigger: 'change' }],
+  freightSettlement: [{ required: true, message: '请选择运费结算方式', trigger: 'change' }],
+  transportTemp: [{ required: true, message: '请输入运输温度', trigger: 'blur' }],
   receiverUnit: [{ required: true, message: '接收方单位不能为空', trigger: 'blur' }],
   receiverAddress: [{ required: true, message: '接收方地址不能为空', trigger: 'blur' }],
   receiverName: [{ required: true, message: '接收联系人不能为空', trigger: 'blur' }],
@@ -704,7 +776,7 @@ const handleRevokeShipment = async (shipmentId: number) => {
     if (editingId.value) {
       const data = await ReagentApi.getApplyDetail(editingId.value)
       Object.assign(formData, data)
-      formData.items = data.items || []
+      formData.items = withStorageTempArr(data.items || [])
     }
     await loadShipmentHistory()
     selectedShipments.value = []
@@ -810,6 +882,7 @@ const confirmFlatPick = () => {
   item.content = b.spec || '' // 规格/浓度
   item.lotNo = b.lotNo || ''
   item.storageTemp = b.storageTemp || ''
+  ;(item as any).storageTempArr = splitStorageTemp(b.storageTemp)
   item.storageLocation = b.storageLocation || ''
   item.expirationDate = flatExpireToMillis(b.expireDate)
   flatPickerVisible.value = false
@@ -828,6 +901,25 @@ const flatExpireToMillis = (s?: string): number | '' => {
   return isNaN(t.getTime()) ? '' : t.getTime()
 }
 
+// ==================== 储存温度多选（逗号拼接落库） ====================
+/** "2-8°C,避光保存" → ["2-8°C","避光保存"] */
+const splitStorageTemp = (v?: string | null): string[] =>
+  v ? String(v).split(',').map((s: string) => s.trim()).filter(Boolean) : []
+
+/** 多选数组 → 逗号拼接字符串 */
+const joinStorageTemp = (arr?: string[] | null): string => (arr || []).join(',')
+
+/** 给明细行附加编辑用 storageTempArr（数组），storageTemp 保持逗号字符串不变 */
+const withStorageTempArr = (list: any[]) =>
+  (list || []).map((it: any) => ({ ...it, storageTempArr: splitStorageTemp(it.storageTemp) }))
+
+/** 提交前把明细行多选数组写回 storageTemp 字符串 */
+const syncItemsStorageTemp = () => {
+  for (const it of formData.items || []) {
+    it.storageTemp = joinStorageTemp((it as any).storageTempArr)
+  }
+}
+
 // ==================== 明细行操作 ====================
 const addItem = () => {
   const item = {
@@ -840,6 +932,7 @@ const addItem = () => {
     content: '',
     lotNo: '',
     storageTemp: '',
+    storageTempArr: [] as string[],
     storageLocation: '',
     expirationDate: '',
     requestedQty: 1,
@@ -890,18 +983,19 @@ const open = async (m: string, id?: number) => {
   editingId.value = id
   dialogVisible.value = true
   formLoading.value = true
-  // 收发信息：仅新增模式默认展开，其他模式默认折叠
-  showAddress.value = m === 'create'
+  // 收发信息：新增/编辑默认展开；编辑模式下不可折叠（区域必选等信息需可见）
+  showAddress.value = m === 'create' || m === 'edit'
 
   // 批号选择为远程搜索，无需预加载
 
   // 重置表单
   Object.assign(formData, {
     id: undefined,
-    consignorUnit: '上海精翰生物科技有限公司',
-    consignorAddress: '上海市浦东新区加枫路8号5楼',
-    consignorName: '样品管理组',
-    consignorPhone: '021-50833588-526',
+    consignorUnit: '',
+    consignorAddress: '',
+    consignorName: '',
+    consignorPhone: '',
+    region: '',
     receiverUnit: '',
     receiverAddress: '',
     receiverName: '',
@@ -920,11 +1014,12 @@ const open = async (m: string, id?: number) => {
     try {
       const data = await ReagentApi.getApplyDetail(id)
       Object.assign(formData, data)
-      formData.items = data.items || []  // 显式赋值保证明细 reactivity
-      // 批号选择为弹窗（扁平表），无需预加载；为 ship 模式添加临时的 _shipQty 字段
-      for (const item of data.items || []) {
-        ;(item as any)._shipQty = 0
-      }
+      // 明细行：附加编辑用 storageTempArr（多选数组）与 ship 模式临时 _shipQty
+      formData.items = (data.items || []).map((item: any) => ({
+        ...item,
+        _shipQty: 0,
+        storageTempArr: splitStorageTemp(item.storageTemp)
+      }))
     } catch {
       message.error('加载申请单失败')
     }
@@ -945,7 +1040,12 @@ const handleSave = async () => {
     message.warning('请至少添加一条试剂明细')
     return
   }
+  if (!formData.region) {
+    message.warning('请选择发货区域（上海地址 / 宁波地址）')
+    return
+  }
   await formRef.value?.validate()
+  syncItemsStorageTemp()
   formLoading.value = true
   try {
     if (mode.value === 'create') {
@@ -955,6 +1055,39 @@ const handleSave = async () => {
       await ReagentApi.updateApply(formData)
       message.success('申请单修改成功')
     }
+    dialogVisible.value = false
+    emit('success')
+  } finally {
+    formLoading.value = false
+  }
+}
+
+// ==================== 保存并提交 ====================
+const handleSaveAndSubmit = async () => {
+  if (!formData.items || formData.items.length === 0) {
+    message.warning('请至少添加一条试剂明细')
+    return
+  }
+  if (!formData.region) {
+    message.warning('请选择发货区域（上海地址 / 宁波地址）')
+    return
+  }
+  await formRef.value?.validate()
+  syncItemsStorageTemp()
+  formLoading.value = true
+  try {
+    if (mode.value === 'create') {
+      const id = await ReagentApi.createApply(formData)
+      if (id) {
+        await ReagentApi.submitApply(id)
+      }
+    } else {
+      await ReagentApi.updateApply(formData)
+      if (formData.id) {
+        await ReagentApi.submitApply(formData.id)
+      }
+    }
+    message.success('已保存并提交')
     dialogVisible.value = false
     emit('success')
   } finally {

@@ -40,7 +40,16 @@
 
     <!-- ============ 扁平表（一行=一批，老ERP同步 + 可编辑/可删除） ============ -->
     <ContentWrap>
-      <div class="mb-8px" style="display: flex; justify-content: flex-end">
+      <div class="mb-8px" style="display: flex; justify-content: flex-end; gap: 8px">
+        <el-button
+          size="small"
+          type="primary"
+          plain
+          :loading="syncLoading"
+          @click="handleManualSync"
+        >
+          <Icon icon="ep:refresh" />手动同步
+        </el-button>
         <el-popover placement="bottom-end" :width="220" trigger="click">
           <template #reference>
             <el-button size="small"><Icon icon="ep:setting" />列设置</el-button>
@@ -121,9 +130,10 @@
         </el-form-item>
         <el-form-item label="储存温度" prop="storageTemp">
           <el-select
-            v-model="editForm.storageTemp"
-            placeholder="请选择储存温度"
+            v-model="editStorageTempArr"
+            placeholder="请选择储存温度（可多选）"
             clearable
+            multiple
             filterable
             allow-create
             default-first-option
@@ -176,6 +186,11 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
+            <el-form-item label="品牌" prop="brand">
+              <el-input v-model="receiptForm.brand" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
             <el-form-item label="接收日期" prop="receiveDate">
               <el-date-picker v-model="receiptForm.receiveDate" type="date" value-format="YYYY-MM-DD" placeholder="接收日期" style="width: 100%" />
             </el-form-item>
@@ -208,9 +223,10 @@
           <el-col :span="12">
             <el-form-item label="储存温度" prop="storageTemp">
               <el-select
-                v-model="receiptForm.storageTemp"
-                placeholder="请选择储存温度"
+                v-model="receiptStorageTempArr"
+                placeholder="请选择储存温度（可多选）"
                 clearable
+                multiple
                 filterable
                 allow-create
                 default-first-option
@@ -322,12 +338,41 @@ const resetQuery = () => {
 
 getList()
 
+// ==================== 手动同步（2 分钟限一次，冷却由后端 Redis 拦截，多用户共享） ====================
+const syncLoading = ref(false)
+
+const handleManualSync = async () => {
+  syncLoading.value = true
+  try {
+    const res = await ReagentApi.syncReagentChain()
+    if (typeof res === 'string' && res.startsWith('失败')) {
+      // 后端 Redis 冷却拦截（如“同步过于频繁，请 2 分钟后再试”）
+      message.warning(res)
+      return
+    }
+    message.success('同步成功')
+    getList()
+  } catch (e: any) {
+    message.error(e?.message || '同步失败')
+  } finally {
+    syncLoading.value = false
+  }
+}
+
 // ==================== 编辑（可维护字段；同步来源字段只读） ====================
 const editDialogVisible = ref(false)
 const editDialogTitle = ref('')
 const editFormLoading = ref(false)
 const editFormRef = ref()
 const editForm = reactive<ReagentApi.ReagentBaseFlatVO>({})
+
+/** 储存温度多选（值存 editForm.storageTemp，逗号拼接） */
+const editStorageTempArr = computed({
+  get: () => (editForm.storageTemp ? String(editForm.storageTemp).split(',').map((s: string) => s.trim()).filter(Boolean) : []),
+  set: (v: string[]) => {
+    editForm.storageTemp = v.join(',')
+  }
+})
 
 const openEditForm = (row: ReagentApi.ReagentBaseFlatVO) => {
   editDialogTitle.value = '编辑试剂基础信息'
@@ -392,6 +437,7 @@ const receiptForm = reactive({
   name: '',
   basId: '',
   vendor: '',
+  brand: '',
   receiveDate: '',
   qty: '',
   contentPerUnit: '',
@@ -403,11 +449,20 @@ const receiptForm = reactive({
   comment: ''
 })
 
+/** 接收单储存温度多选（值存 receiptForm.storageTemp，逗号拼接发到后端替换 {{storageTemp}}） */
+const receiptStorageTempArr = computed({
+  get: () => (receiptForm.storageTemp ? String(receiptForm.storageTemp).split(',').map((s: string) => s.trim()).filter(Boolean) : []),
+  set: (v: string[]) => {
+    receiptForm.storageTemp = v.join(',')
+  }
+})
+
 const openReceiptForm = (row: ReagentApi.ReagentBaseFlatVO) => {
   Object.assign(receiptForm, {
     name: row.reagentName || '',
     basId: row.basId || '',
     vendor: row.vendor || '',
+    brand: row.brand || '',
     receiveDate: today(),
     qty: '',
     contentPerUnit: '',

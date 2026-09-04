@@ -34,6 +34,7 @@ export interface ReagentApplyVO {
   consignorAddress?: string
   consignorName?: string
   consignorPhone?: string
+  region?: string // 发货区域：上海/宁波
   receiverUnit: string
   receiverAddress: string
   receiverName: string
@@ -43,10 +44,13 @@ export interface ReagentApplyVO {
   remark?: string
   createTime?: string
   creator?: string
+  creatorName?: string // 创建人昵称（列表展示）
   freightSettlement?: string
   projectNo?: string
   transportTemp?: string
   hasTempLogger?: number
+  plannedShipDate?: string // 计划运出日期
+  note?: string // 备注
   items?: ReagentApplyItemVO[]
 }
 
@@ -112,6 +116,11 @@ export const deleteBaseFlat = (id: number) => {
 // 生成生物试剂接收单（docx）
 export const generateBaseReceipt = (data: any) => {
   return request.postOriginal({ url: '/reagent/base-flat/generate-receipt', data, responseType: 'blob' })
+}
+
+// 手动触发试剂全链路同步（erpSync + erpPush + 扁平；2 分钟内限一次）
+export const syncReagentChain = (param?: string) => {
+  return request.post({ url: '/mes/erp-reagent/sync', params: { param } })
 }
 
 // ==================== 申请单 API ====================

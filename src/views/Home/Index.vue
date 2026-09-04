@@ -143,42 +143,58 @@
       <el-col
         v-for="(item, index) in toolboxTools"
         :key="`toolbox-${index}`"
-        :xl="4"
-        :lg="4"
-        :md="6"
-        :sm="8"
+        :xl="6"
+        :lg="6"
+        :md="8"
+        :sm="12"
         :xs="12"
         class="!flex"
       >
-        <el-card shadow="hover" class="flex-1" body-class="!p-10px">
-          <div class="flex items-center justify-between gap-x-6px">
+        <el-card shadow="hover" class="flex-1" body-class="!p-12px">
+          <!-- 第一行：图标 + 名称 + 说明按钮 -->
+          <div class="flex items-center gap-x-6px">
+            <el-image
+              v-if="isToolIconUrl(item.icon)"
+              :src="item.icon"
+              class="h-18px w-18px flex-none"
+              fit="contain"
+            />
+            <Icon
+              v-else-if="item.icon"
+              :icon="item.icon"
+              :size="18"
+              class="flex-none"
+              :style="{ color: '#409EFF' }"
+            />
+            <span class="min-w-0 flex-1 truncate text-13px" :title="item.name">{{ item.name }}</span>
+            <el-popover :width="260" trigger="click">
+              <template #reference>
+                <el-button link type="primary" class="!p-0 !text-12px">
+                  <Icon icon="ep:info-filled" class="mr-2px" /> 说明
+                </el-button>
+              </template>
+              <div class="text-13px">
+                <div class="mb-8px text-14px font-bold">{{ item.name }}</div>
+                <div class="text-gray-500" style="white-space: pre-line">
+                  {{ item.description || '暂无说明' }}
+                </div>
+              </div>
+            </el-popover>
+          </div>
+          <!-- 第二行：分类/版本 + 下载（下载在版本后面） -->
+          <div
+            v-if="item.category || item.version"
+            class="mt-6px flex items-center justify-between gap-x-6px"
+          >
             <div class="flex min-w-0 items-center">
-              <el-image
-                v-if="isToolIconUrl(item.icon)"
-                :src="item.icon"
-                class="mr-6px h-18px w-18px flex-none"
-                fit="contain"
-              />
-              <Icon
-                v-else-if="item.icon"
-                :icon="item.icon"
-                :size="18"
-                class="mr-6px flex-none"
-                :style="{ color: '#409EFF' }"
-              />
-              <span
-                class="min-w-0 truncate text-13px"
-                :title="item.description ? `${item.name}：${item.description}` : item.name"
-                >{{ item.name }}</span
-              >
+              <el-tag v-if="item.category" size="small">{{ item.category }}</el-tag>
+              <el-tag v-if="item.version" size="small" type="info" class="ml-6px">
+                {{ item.version }}
+              </el-tag>
             </div>
             <el-button size="small" type="primary" @click="handleToolDownload(item)">
               <Icon icon="ep:download" class="mr-5px" /> 下载
             </el-button>
-          </div>
-          <div v-if="item.category || item.version" class="mt-6px flex items-center">
-            <el-tag v-if="item.category" size="small">{{ item.category }}</el-tag>
-            <el-tag v-if="item.version" size="small" type="info" class="ml-6px">{{ item.version }}</el-tag>
           </div>
         </el-card>
       </el-col>
