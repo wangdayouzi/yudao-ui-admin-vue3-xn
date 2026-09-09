@@ -34,6 +34,7 @@ export interface ReagentApplyVO {
   consignorAddress?: string
   consignorName?: string
   consignorPhone?: string
+  consignorEmail?: string // 发货方邮箱：发货任务通知的收件人（留空则不发送邮件）
   region?: string // 发货区域：上海/宁波
   receiverUnit: string
   receiverAddress: string

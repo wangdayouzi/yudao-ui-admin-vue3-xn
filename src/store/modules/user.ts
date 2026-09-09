@@ -11,6 +11,7 @@ interface UserVO {
   avatar: string
   nickname: string
   deptId: number
+  email: string
 }
 
 interface UserInfoVO {
@@ -30,7 +31,8 @@ export const useUserStore = defineStore('admin-user', {
       id: 0,
       avatar: '',
       nickname: '',
-      deptId: 0
+      deptId: 0,
+      email: ''
     }
   }),
   getters: {
@@ -87,6 +89,7 @@ export const useUserStore = defineStore('admin-user', {
       await loginOut()
       removeToken()
       deleteUserCache() // 删除用户缓存
+      sessionStorage.removeItem('EMAIL_EMPTY_REMINDED') // 重新登录后再提醒一次
       this.resetState()
     },
     resetState() {
@@ -97,7 +100,8 @@ export const useUserStore = defineStore('admin-user', {
         id: 0,
         avatar: '',
         nickname: '',
-        deptId: 0
+        deptId: 0,
+        email: ''
       }
     }
   }

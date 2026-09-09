@@ -28,7 +28,25 @@
           </el-col>
           <el-col :span="8">
             <el-form-item label="运输温度" prop="transportTemp">
-              <el-input v-model="formData.transportTemp" placeholder="如：2-8°C" :disabled="isReadonly" />
+              <el-select
+                v-if="!isReadonly"
+                v-model="transportTempArr"
+                placeholder="如：2-8°C"
+                clearable
+                multiple
+                filterable
+                allow-create
+                default-first-option
+                style="width: 100%"
+              >
+                <el-option
+                  v-for="dict in getStrDictOptions(DICT_TYPE.REAGENT_STORAGE_CONDITION)"
+                  :key="dict.value"
+                  :label="dict.label"
+                  :value="dict.value"
+                />
+              </el-select>
+              <span v-else>{{ formData.transportTemp || '-' }}</span>
             </el-form-item>
           </el-col>
           <el-col :span="8">
@@ -469,6 +487,14 @@
                 </el-form-item>
               </el-col>
             </el-row>
+            <el-form-item label="邮箱" prop="consignorEmail" class="mb-8px">
+              <el-input
+                v-model="formData.consignorEmail"
+                :disabled="isReadonly"
+                placeholder="发货通知收件邮箱，可编辑，留空则不发送邮件"
+                clearable
+              />
+            </el-form-item>
             <el-form-item label="单位" prop="consignorUnit" class="mb-8px">
               <el-input v-model="formData.consignorUnit" :disabled="isReadonly" />
             </el-form-item>
@@ -671,7 +697,8 @@ const fillConsignorShanghai = () => {
     consignorUnit: '上海精翰生物科技有限公司',
     consignorAddress: '上海市浦东新区(上海)自由贸易试验区加枫路8号7层A32',
     consignorName: '精翰样品管理组',
-    consignorPhone: '18117369294'
+    consignorPhone: '18117369294',
+    consignorEmail: 'jhsh_sample@accurantbio.com'
   })
 }
 const fillConsignorNingbo = () => {
@@ -680,7 +707,8 @@ const fillConsignorNingbo = () => {
     consignorUnit: '宁波熙宁检测技术有限公司',
     consignorAddress: '浙江省宁波市高新区聚贤路587弄科技大市场A5-8楼',
     consignorName: '宁波样品管理组',
-    consignorPhone: '0574-87878472-821'
+    consignorPhone: '0574-87878472-821',
+    consignorEmail: 'xnnb_sample@accurantbio.com'
   })
 }
 
@@ -690,6 +718,7 @@ const formData = reactive<ReagentApi.ReagentApplyVO>({
   consignorAddress: '',
   consignorName: '',
   consignorPhone: '',
+  consignorEmail: '',
   region: '',
   receiverUnit: '',
   receiverAddress: '',
@@ -704,10 +733,19 @@ const formData = reactive<ReagentApi.ReagentApplyVO>({
   items: []
 })
 
+// 运输温度多选（字典/可输入，与明细储存温度一致）：数组 <-> 逗号拼接字符串
+const transportTempArr = computed({
+  get: () => (formData.transportTemp ? String(formData.transportTemp).split(',').map((s: string) => s.trim()).filter(Boolean) : []),
+  set: (v: string[]) => {
+    formData.transportTemp = v.join(',')
+  }
+})
+
 const formRules = {
   region: [{ required: true, message: '请选择发货区域（上海/宁波）', trigger: 'change' }],
   freightSettlement: [{ required: true, message: '请选择运费结算方式', trigger: 'change' }],
-  transportTemp: [{ required: true, message: '请输入运输温度', trigger: 'blur' }],
+  transportTemp: [{ required: true, message: '请选择运输温度', trigger: 'change' }],
+  plannedShipDate: [{ required: true, message: '请选择计划运出日期', trigger: 'change' }],
   receiverUnit: [{ required: true, message: '接收方单位不能为空', trigger: 'blur' }],
   receiverAddress: [{ required: true, message: '接收方地址不能为空', trigger: 'blur' }],
   receiverName: [{ required: true, message: '接收联系人不能为空', trigger: 'blur' }],
@@ -717,6 +755,10 @@ const formRules = {
   ],
   consignorPhone: [
     { pattern: /^(\+?86)?1[3-9]\d{9}$|^\d{3,4}-\d{7,8}(-\d{1,6})?$/, message: '请输入正确的手机号/座机号（支持+86或86开头手机号，座机可带分机）', trigger: 'blur' }
+  ],
+  // 发货方邮箱：非必填（留空则不发送邮件），填写时校验邮箱格式
+  consignorEmail: [
+    { pattern: /^[\w.%+-]+@[\w.-]+\.[A-Za-z]{2,}$/, message: '请输入正确的邮箱地址', trigger: 'blur' }
   ]
 }
 
@@ -995,6 +1037,7 @@ const open = async (m: string, id?: number) => {
     consignorAddress: '',
     consignorName: '',
     consignorPhone: '',
+    consignorEmail: '',
     region: '',
     receiverUnit: '',
     receiverAddress: '',

@@ -1,5 +1,6 @@
 import router from './router'
 import type { RouteRecordRaw } from 'vue-router'
+import { ElMessageBox } from 'element-plus'
 import { isRelogin } from '@/config/axios/service'
 import { getAccessToken, setToken } from '@/utils/auth'
 import { useTitle } from '@/hooks/web/useTitle'
@@ -13,6 +14,29 @@ import { parseRouteLocation } from '@/utils/routeParams'
 const { start, done } = useNProgress()
 
 const { loadStart, loadDone } = usePageLoading()
+
+// 登录后提醒：用户邮箱为空时提示完善（每个浏览器会话只弹一次，避免每次刷新都打扰）
+const EMAIL_EMPTY_REMIND_KEY = 'EMAIL_EMPTY_REMINDED'
+const remindEmptyEmail = () => {
+  const userStore = useUserStoreWithOut()
+  const email = (userStore.getUser.email || '').trim()
+  if (email) {
+    return // 已有邮箱，无需提醒
+  }
+  if (sessionStorage.getItem(EMAIL_EMPTY_REMIND_KEY)) {
+    return // 本会话已提醒过，避免重复打扰
+  }
+  sessionStorage.setItem(EMAIL_EMPTY_REMIND_KEY, '1')
+  ElMessageBox.confirm('您的账号尚未填写邮箱，将无法正常接收发货等邮件通知。建议前往个人中心完善邮箱。', '完善邮箱提醒', {
+    confirmButtonText: '去完善',
+    cancelButtonText: '暂不',
+    type: 'warning'
+  })
+    .then(() => {
+      router.push('/user/profile')
+    })
+    .catch(() => {})
+}
 
 // 路由不重定向白名单
 const whiteList = [
@@ -60,6 +84,8 @@ router.beforeEach(async (to, from) => {
         isRelogin.show = true
         await userStore.setUserInfoAction()
         isRelogin.show = false
+        // 登录后：邮箱为空时提醒完善（含账号密码/短信/钉钉OAuth等所有登录方式）
+        remindEmptyEmail()
         // 后端过滤菜单
         await permissionStore.generateRoutes()
         permissionStore.getAddRouters.forEach((route) => {
