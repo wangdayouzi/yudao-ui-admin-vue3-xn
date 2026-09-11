@@ -30,24 +30,56 @@
 
     <!-- ============ 查询结果（一个 BASID 可能对应多个批号） ============ -->
     <ContentWrap v-if="resultList.length > 0">
-      <div class="section-title">查询结果（点击选择要打印的批次）</div>
+      <div class="section-title">查询结果（共 {{ resultTotal }} 条，每页 5 条；点击选择要打印的批次）</div>
       <el-table
         v-loading="queryLoading"
         :data="resultList"
         highlight-current-row
         @current-change="onCurrentChange"
       >
+        <el-table-column type="index" label="#" width="56" :index="getRowIndex" />
         <el-table-column label="名称" prop="name" min-width="200" show-overflow-tooltip />
         <el-table-column label="BASID" prop="basId" width="180" />
         <el-table-column label="批号" prop="batchNo" width="160" />
+        <el-table-column label="存储位置" prop="storageLocation" min-width="160" show-overflow-tooltip />
         <el-table-column label="过期日期" prop="expireDate" width="140" />
       </el-table>
+      <el-pagination
+        v-if="resultTotal > queryParams.pageSize"
+        v-model:current-page="queryParams.pageNo"
+        :page-size="queryParams.pageSize"
+        :total="resultTotal"
+        background
+        layout="total, prev, pager, next, jumper"
+        class="result-pagination"
+        @current-change="handlePageChange"
+      />
     </ContentWrap>
 
     <!-- ============ 打印标签表单 ============ -->
     <ContentWrap v-if="selectedRow">
       <div class="section-title">打印标签信息</div>
       <el-form :model="printForm" label-width="100px" style="max-width: 640px">
+        <el-form-item label="打印机" required>
+          <el-select v-model="printForm.printerId" :loading="printerLoading" placeholder="请选择标签打印机" style="width: 100%" @change="cachePrinterSelection">
+            <el-option
+              v-for="printer in printers"
+              :key="printer.id"
+              :label="`${printer.name}${printer.onlineStatus === 1 ? '' : '（离线）'}`"
+              :value="printer.id"
+              :disabled="printer.onlineStatus !== 1"
+            />
+          </el-select>
+          <div class="form-tip">任务会由该打印机所在 Windows 服务自动领取并打印，无需弹出浏览器打印窗口。</div>
+        </el-form-item>
+        <el-form-item label="标签模板" required>
+          <el-select v-model="printForm.templateCode" :loading="templateLoading" placeholder="请选择标签模板" style="width: 100%" @change="cacheTemplateSelection">
+            <el-option v-for="template in templates" :key="template.code" :label="template.name" :value="template.code" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="打印份数" required>
+          <el-input-number v-model="printForm.copies" :min="1" :max="50" />
+        </el-form-item>
         <el-form-item label="名称" prop="name">
           <el-input v-model="printForm.name" placeholder="可修改" />
         </el-form-item>
@@ -74,6 +106,9 @@
             />
           </el-select>
         </el-form-item>
+        <el-form-item label="存储位置" prop="storageLocation">
+          <el-input v-model="printForm.storageLocation" placeholder="请输入存储位置" />
+        </el-form-item>
         <el-form-item label="过期日期" prop="expireDate">
           <el-input v-model="printForm.expireDate" placeholder="可修改" />
         </el-form-item>
@@ -94,51 +129,42 @@
         </el-form-item>
       </el-form>
       <div style="margin-top: 12px">
-        <el-button v-hasPermi="['reagent:label-print:print']" type="primary" @click="handlePreview">
-          <Icon icon="ep:printer" />打印
+        <el-button v-hasPermi="['reagent:label-print:print']" type="primary" :loading="jobSubmitting" @click="handleLabelPrint">
+          <Icon icon="ep:printer" />提交打印
         </el-button>
-        <el-button v-hasPermi="['reagent:label-print:print']" type="primary" plain @click="handleLabelPreview">
-          <Icon icon="ep:tickets" />打印标签
+        <el-button v-hasPermi="['reagent:label-print:print']" @click="handlePrint">
+          <Icon icon="ep:download" />导出 Excel（旧格式）
+        </el-button>
+        <el-button @click="openPrintHistory">
+          <Icon icon="ep:document" />打印历史
         </el-button>
       </div>
     </ContentWrap>
 
-    <!-- ============ 打印预览弹窗 ============ -->
-    <el-dialog v-model="previewVisible" title="试剂标签打印预览" width="620px" destroy-on-close>
-      <table class="print-table">
-        <tbody>
-          <tr v-for="(item, index) in printRows" :key="index">
-            <th>{{ item.label }}</th>
-            <td>{{ item.value }}</td>
-          </tr>
-        </tbody>
-      </table>
-      <template #footer>
-        <el-button @click="previewVisible = false">关 闭</el-button>
-        <el-button type="primary" :loading="printLoading" @click="handlePrint">打 印</el-button>
-      </template>
+    <el-dialog v-model="historyVisible" title="打印历史（最近 20 条）" width="1100px" destroy-on-close>
+      <el-table v-loading="historyLoading" :data="printHistory" max-height="440" empty-text="暂无打印历史">
+        <el-table-column label="任务编号" prop="jobNo" min-width="210" show-overflow-tooltip />
+        <el-table-column label="打印机" min-width="140" show-overflow-tooltip>
+          <template #default="{ row }">{{ printerNameOf(row.printerId) }}</template>
+        </el-table-column>
+        <el-table-column label="模板" min-width="130" show-overflow-tooltip>
+          <template #default="{ row }">{{ templateNameOf(row.templateCode) }}</template>
+        </el-table-column>
+        <el-table-column label="份数" width="70">
+          <template #default="{ row }">{{ row.printedCount || 0 }}/{{ row.copies }}</template>
+        </el-table-column>
+        <el-table-column label="状态" width="94">
+          <template #default="{ row }">
+            <el-tag :type="jobStatusTagType(row.status)">{{ jobStatusText(row.status) }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="失败原因" prop="errorMessage" min-width="220" show-overflow-tooltip />
+        <el-table-column label="提交时间" width="170">
+          <template #default="{ row }">{{ formatHistoryTime(row.createTime) }}</template>
+        </el-table-column>
+      </el-table>
     </el-dialog>
 
-    <!-- ============ 标签打印弹窗（36mm，浏览器打印到 PT-P900） ============ -->
-    <el-dialog v-model="labelVisible" title="标签预览（36mm）" width="560px" destroy-on-close>
-      <div class="label-preview-wrap">
-        <div id="labelPrintArea" class="label-sheet">
-          <div class="label-row"><span class="label-key">Name:</span><span class="label-val">{{ printForm.name }}</span></div>
-          <div class="label-row"><span class="label-key">BASID:</span><span class="label-val">{{ printForm.basId }}</span></div>
-          <div class="label-row"><span class="label-key">LOT:</span><span class="label-val">{{ printForm.batchNo }}</span></div>
-          <div class="label-row"><span class="label-key">Storage condition(unopen):</span><span class="label-val">{{ printForm.storageCondition }}</span></div>
-          <div class="label-row"><span class="label-key">Received date:</span><span class="label-val">{{ printForm.receiveDate }}</span></div>
-          <div class="label-row"><span class="label-key">Received by:</span><span class="label-val">{{ printForm.receiverName }}</span></div>
-          <div class="label-row"><span class="label-key">Exp.Date(unopen):</span><span class="label-val">{{ printForm.expireDate }}</span></div>
-          <div class="label-row"><span class="label-key">Remark:</span><span class="label-val">{{ printForm.remark }}</span></div>
-        </div>
-      </div>
-      <div class="label-tip">打印时务必：① 选择 PT-P900；② 更多设置 → 纸张尺寸选「shijibiaoqian」（1.4in × 1.18in）；③ 取消「页眉和页脚」；④ 缩放 100%。纸张不对会出现空白/裁切。</div>
-      <template #footer>
-        <el-button @click="labelVisible = false">关 闭</el-button>
-        <el-button type="primary" @click="handleLabelPrint">打 印</el-button>
-      </template>
-    </el-dialog>
   </div>
 </template>
 
@@ -156,8 +182,14 @@ const userStore = useUserStoreWithOut()
 
 // ==================== 查询 ====================
 const queryLoading = ref(false)
-const queryParams = reactive({ basId: '' })
+const queryParams = reactive({
+  basId: '',
+  pageNo: 1,
+  // 标签页固定每页 5 条，避免查询结果把下面的打印表单顶出屏幕。
+  pageSize: 5
+})
 const resultList = ref<ReagentApi.ReagentLabelPrintVO[]>([])
+const resultTotal = ref(0)
 const selectedRow = ref<ReagentApi.ReagentLabelPrintVO | null>(null)
 
 const handleQuery = async () => {
@@ -170,40 +202,160 @@ const handleQuery = async () => {
     message.warning('BASID 必须包含 "bas" 字符')
     return
   }
+  queryParams.pageNo = 1
+  // 只有新的查询条件才清空已选试剂；翻页保留，方便对照不同批次。
+  selectedRow.value = null
+  resetPrintForm()
+  await loadResultPage()
+}
+
+const loadResultPage = async () => {
   queryLoading.value = true
   try {
-    resultList.value = await ReagentApi.getLabelPrintByBasId(basId)
-    selectedRow.value = null
-    resetPrintForm()
+    const data = await ReagentApi.getLabelPrintByBasId({ basId: queryParams.basId.trim(), pageNo: queryParams.pageNo })
+    resultList.value = data.list
+    resultTotal.value = data.total
     if (resultList.value.length === 0) {
       message.warning('未查询到相关数据')
-    } else {
-      // 默认选中第一条，方便直接进入打印
-      onCurrentChange(resultList.value[0])
     }
   } finally {
     queryLoading.value = false
   }
 }
 
+const handlePageChange = async (pageNo: number) => {
+  queryParams.pageNo = pageNo
+  // 翻页不清空当前已选试剂及其已修改的标签内容。
+  await loadResultPage()
+}
+
+const getRowIndex = (index: number) => (queryParams.pageNo - 1) * queryParams.pageSize + index + 1
+
 const resetQuery = () => {
   queryParams.basId = ''
+  queryParams.pageNo = 1
   resultList.value = []
+  resultTotal.value = 0
   selectedRow.value = null
   resetPrintForm()
 }
 
 // ==================== 打印表单 ====================
 const printForm = reactive({
+  printerId: undefined as number | undefined,
+  templateCode: '',
+  copies: 1,
   name: '',
   basId: '',
   batchNo: '',
   storageCondition: '',
+  storageLocation: '',
   expireDate: '',
   receiverId: undefined as number | undefined,
   receiverName: '',
   receiveDate: '',
   remark: ''
+})
+
+// ==================== 逻辑打印机与打印任务 ====================
+const printerLoading = ref(false)
+const templateLoading = ref(false)
+const jobSubmitting = ref(false)
+const printers = ref<ReagentApi.ReagentLabelPrinterVO[]>([])
+const templates = ref<ReagentApi.ReagentLabelTemplateVO[]>([])
+const historyVisible = ref(false)
+const historyLoading = ref(false)
+const printHistory = ref<ReagentApi.ReagentLabelPrintJobVO[]>([])
+
+/** 浏览器本地记住当前用户最近使用的标签打印机；不同站点域名的 localStorage 天然隔离。 */
+const printerStorageKey = () => `reagent-label-print:last-printer:${userStore.getUser?.id || 'anonymous'}`
+
+const cachePrinterSelection = (printerId: number) => {
+  window.localStorage.setItem(printerStorageKey(), String(printerId))
+}
+
+const templateStorageKey = () => `reagent-label-print:last-template:${userStore.getUser?.id || 'anonymous'}`
+
+const cacheTemplateSelection = (templateCode: string) => {
+  window.localStorage.setItem(templateStorageKey(), templateCode)
+}
+
+const loadPrinters = async () => {
+  printerLoading.value = true
+  try {
+    printers.value = await ReagentApi.getLabelPrinters()
+    const cachedPrinterId = Number(window.localStorage.getItem(printerStorageKey()))
+    const cachedPrinter = printers.value.find((item) => item.id === cachedPrinterId)
+    // 优先使用该浏览器上次选择的打印机；即使它已离线也不自动切换到别的地点。
+    if (cachedPrinter) {
+      printForm.printerId = cachedPrinter.id
+      return
+    }
+    // 没有历史选择时才默认第一台在线机，并记住该选择。
+    if (!printForm.printerId) {
+      const firstOnlinePrinter = printers.value.find((item) => item.onlineStatus === 1)
+      if (firstOnlinePrinter) {
+        printForm.printerId = firstOnlinePrinter.id
+        cachePrinterSelection(firstOnlinePrinter.id)
+      }
+    }
+  } finally {
+    printerLoading.value = false
+  }
+}
+
+const loadTemplates = async () => {
+  templateLoading.value = true
+  try {
+    templates.value = await ReagentApi.getLabelTemplates()
+    const cachedTemplateCode = window.localStorage.getItem(templateStorageKey())
+    const cachedTemplate = templates.value.find((item) => item.code === cachedTemplateCode)
+    if (cachedTemplate) {
+      printForm.templateCode = cachedTemplate.code
+      return
+    }
+    if (!printForm.templateCode) {
+      const firstTemplate = templates.value[0]
+      printForm.templateCode = firstTemplate?.code || ''
+      if (firstTemplate) {
+        cacheTemplateSelection(firstTemplate.code)
+      }
+    }
+  } finally {
+    templateLoading.value = false
+  }
+}
+
+const printerNameOf = (printerId?: number) => printers.value.find((item) => item.id === printerId)?.name || `打印机 #${printerId ?? '-'}`
+const templateNameOf = (templateCode?: string) => templates.value.find((item) => item.code === templateCode)?.name || templateCode || '-'
+const formatHistoryTime = (time?: string) => time ? dayjs(time).format('YYYY-MM-DD HH:mm:ss') : '-'
+const jobStatusText = (status?: number) => {
+  const map: Record<number, string> = { 0: '待领取', 1: '已领取', 2: '打印中', 3: '成功', 4: '失败', 5: '已取消' }
+  return map[status ?? -1] || '未知'
+}
+const jobStatusTagType = (status?: number) => {
+  const map: Record<number, string> = { 0: 'info', 1: 'warning', 2: 'warning', 3: 'success', 4: 'danger', 5: 'info' }
+  return map[status ?? -1] || 'info'
+}
+
+const openPrintHistory = async () => {
+  historyVisible.value = true
+  historyLoading.value = true
+  try {
+    const [jobs] = await Promise.all([
+      ReagentApi.getRecentLabelPrintJobs(),
+      loadPrinters(),
+      loadTemplates()
+    ])
+    printHistory.value = jobs
+  } finally {
+    historyLoading.value = false
+  }
+}
+
+onMounted(() => {
+  loadPrinters()
+  loadTemplates()
 })
 
 /** 存储条件多选（值存 printForm.storageCondition，逗号拼接打印到标签） */
@@ -221,10 +373,14 @@ const resetPrintForm = () => {
   // 接收人默认当前用户昵称
   const user = userStore.getUser
   Object.assign(printForm, {
+    printerId: printForm.printerId,
+    templateCode: printForm.templateCode,
+    copies: 1,
     name: '',
     basId: '',
     batchNo: '',
     storageCondition: '',
+    storageLocation: '',
     expireDate: '',
     receiverId: user?.id,
     receiverName: user?.nickname || '',
@@ -236,55 +392,33 @@ const resetPrintForm = () => {
 const onCurrentChange = (row: ReagentApi.ReagentLabelPrintVO) => {
   if (!row) return
   selectedRow.value = row
+  // 选择另一条试剂时按默认值重新带入，避免把上一条的手工修改误打到新批次。
+  resetPrintForm()
   Object.assign(printForm, {
     name: row.name ?? '',
-    basId: row.basId ?? '',
+    basId: stripLabelBasIdPrefix(row.basId),
     batchNo: row.batchNo ?? '',
+    storageLocation: row.storageLocation ?? '',
     expireDate: row.expireDate ?? ''
   })
 }
+
+/** 标签上的 BASID 不显示来源区域前缀（NB-/SH-，不区分大小写）。 */
+const stripLabelBasIdPrefix = (value?: string) => (value || '').replace(/^(?:NB|SH)-/i, '')
 
 /** UserSelectV2 选中回调：取用户昵称 */
 const onReceiverChange = (item: any) => {
   printForm.receiverName = item?.nickname || item?.username || ''
 }
 
-// ==================== 打印预览 ====================
-const previewVisible = ref(false)
-const printLoading = ref(false)
-
-/** 打印表格：每一行一个键值对，键和值各占一个单元格 */
-const printRows = computed(() => [
-  { label: 'Name:', value: printForm.name },
-  { label: 'BASID:', value: printForm.basId },
-  { label: 'LOT:', value: printForm.batchNo },
-  { label: 'Storage condition(unopen):', value: printForm.storageCondition },
-  { label: 'Received date:', value: printForm.receiveDate },
-  { label: 'Received by:', value: printForm.receiverName },
-  { label: 'Exp.Date(unopen):', value: printForm.expireDate },
-  { label: 'Remark:', value: printForm.remark }
-])
-
-const handlePreview = async () => {
-  if (!selectedRow.value) {
-    message.warning('请先查询并选择批次')
-    return
-  }
-  previewVisible.value = true
-}
-
-/** 打印：调用后端生成 Excel 键值对表格并下载 */
+/** 导出旧版 Excel 键值对表格；不再作为 PT-P900 的正式打印链路。 */
 const handlePrint = async () => {
-  printLoading.value = true
   try {
     const res = await ReagentApi.printLabelPrint(printForm)
     downloadBlob(res, `试剂标签-${printForm.basId || 'label'}.xlsx`)
     message.success('打印文件下载中')
-    previewVisible.value = false
   } catch {
     message.error('打印失败')
-  } finally {
-    printLoading.value = false
   }
 }
 
@@ -299,22 +433,42 @@ const downloadBlob = (res: any, fileName: string) => {
   window.URL.revokeObjectURL(url)
 }
 
-// ==================== 标签打印（36mm，浏览器打印到 PT-P900） ====================
-const labelVisible = ref(false)
-
-const handleLabelPreview = () => {
+/** 创建任务，由对应 Windows 打印代理主动领取并调用 Brother b-PAC。 */
+const handleLabelPrint = async () => {
   if (!selectedRow.value) {
     message.warning('请先查询并选择批次')
     return
   }
-  labelVisible.value = true
-}
-
-/** 打印标签：window.print() 只输出 #labelPrintArea（见 @media print 样式）
- *  注意：标签高度用固定值（30mm，与自定义纸张 shijibiaoqian 高度一致），不要用内容动态高度——
- *  过小的 @page 会被 Chrome 回退成默认纸张，导致空白/裁切 */
-const handleLabelPrint = () => {
-  window.print()
+  if (!printForm.printerId) {
+    message.warning('请选择在线的标签打印机')
+    return
+  }
+  const selectedPrinter = printers.value.find((item) => item.id === printForm.printerId)
+  if (!selectedPrinter || selectedPrinter.onlineStatus !== 1) {
+    message.warning('当前记住的标签打印机离线，请选择一台在线打印机')
+    return
+  }
+  if (!printForm.templateCode) {
+    message.warning('请选择标签模板')
+    return
+  }
+  const printerName = selectedPrinter.name
+  const templateName = templates.value.find((item) => item.code === printForm.templateCode)?.name || printForm.templateCode
+  try {
+    await message.confirm(`确认向“${printerName}”提交 ${printForm.copies} 份“${templateName}”标签吗？提交后将由现场标签机实际出纸。`)
+  } catch {
+    return
+  }
+  jobSubmitting.value = true
+  try {
+    const { printerId, templateCode, copies, receiverId: _receiverId, ...label } = printForm
+    const jobId = await ReagentApi.createLabelPrintJob({ printerId, templateCode, copies, label })
+    message.success(`打印任务已提交（任务 ID：${jobId}）`)
+  } catch {
+    message.error('提交打印任务失败')
+  } finally {
+    jobSubmitting.value = false
+  }
 }
 </script>
 
@@ -325,87 +479,16 @@ const handleLabelPrint = () => {
   margin-bottom: 12px;
 }
 
-.print-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.print-table th,
-.print-table td {
-  border: 1px solid #dcdfe6;
-  padding: 10px 12px;
-  text-align: left;
-  font-size: 14px;
-  line-height: 1.6;
-}
-
-.print-table th {
-  width: 120px;
-  background: #f5f7fa;
-  font-weight: bold;
-  color: #303133;
-}
-
-/* ============ 36mm 标签 ============ */
-.label-preview-wrap {
-  display: inline-block;
-  padding: 6px;
-  background: #fff;
-  border: 1px dashed #c0c4cc;
-}
-
-.label-sheet {
-  width: 1.26in; /* ≈32mm，36mm 纸两侧各有 ~2mm 不可打印区，内容收窄到可打印区避免右边被裁 */
-  box-sizing: border-box;
-  padding: 0.6mm 2mm;
-  font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif;
-  font-size: 1.8mm;
-  line-height: 1.1;
-  color: #000;
-  background: #fff;
-}
-
-.label-row {
-  padding: 0.15mm 0;
-}
-
-.label-key {
-  font-weight: 600;
-}
-
-.label-val {
-  word-break: break-all;
-}
-
-.label-tip {
-  margin-top: 8px;
+.form-tip {
+  margin-top: 4px;
   font-size: 12px;
+  line-height: 1.4;
   color: #909399;
 }
-</style>
 
-<style>
-/* 标签打印：只输出 #labelPrintArea，其余隐藏（用于 window.print()） */
-@media print {
-  body * {
-    visibility: hidden !important;
-  }
-  #labelPrintArea,
-  #labelPrintArea * {
-    visibility: visible !important;
-  }
-  #labelPrintArea {
-    position: fixed !important;
-    left: 0 !important;
-    top: 0 !important;
-    width: 1.26in !important; /* 收窄到可打印区，右边不被裁 */
-    border: none !important;
-    box-shadow: none !important;
-  }
-}
-@page {
-  /* 纸张 1.4in × 1.37in（宽×长），landscape 强制横向，避免被旋转成纵向导致第一行被裁 */
-  size: 1.4in 1.37in landscape;
-  margin: 0;
+.result-pagination {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
 }
 </style>

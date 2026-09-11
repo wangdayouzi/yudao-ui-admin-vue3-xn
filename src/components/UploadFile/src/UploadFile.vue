@@ -145,15 +145,15 @@ const beforeUpload: UploadProps['beforeUpload'] = (file: UploadRawFile) => {
 //   uploadRef.value.data.path = uploadFile.name
 // }
 // 文件上传成功
-const handleFileSuccess: UploadProps['onSuccess'] = (res: any): void => {
+const handleFileSuccess: UploadProps['onSuccess'] = (res: any, file): void => {
   message.success('上传成功')
   const response = res as { data: string }
-  // 删除自身
-  const index = fileList.value.findIndex(
-    (item) => (item.response as { data?: string } | undefined)?.data === response.data
-  )
-  fileList.value.splice(index, 1)
-  uploadList.value.push({ name: response.data, url: response.data })
+  // 删除 el-upload 维护的待上传项。文件 URL 是存储地址，不能作为展示文件名。
+  const index = fileList.value.findIndex((item) => item.uid === file.uid)
+  if (index > -1) {
+    fileList.value.splice(index, 1)
+  }
+  uploadList.value.push({ name: file.name, url: response.data })
   if (uploadList.value.length == uploadNumber.value) {
     fileList.value.push(...uploadList.value)
     uploadList.value = []

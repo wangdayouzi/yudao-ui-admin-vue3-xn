@@ -93,6 +93,13 @@
             </el-button>
           </template>
         </el-table-column>
+        <el-table-column v-if="!isReadonly" label="操作" width="70" fixed="left">
+          <template #default="scope">
+            <el-button link type="danger" size="small" @click="removeItem(scope.$index)">
+              删除
+            </el-button>
+          </template>
+        </el-table-column>
         <el-table-column label="试剂名称" min-width="180">
           <template #default="scope">
             <el-input v-if="!isReadonly" v-model="scope.row.reagentName" size="small" placeholder="试剂名称" />
@@ -110,20 +117,33 @@
             <el-input-number
               v-if="!isReadonly"
               v-model="scope.row.requestedQty"
-              :min="1"
+              :min="0.01"
+              :precision="2"
+              :step="0.01"
               size="small"
               controls-position="right"
               style="width: 100%"
             />
-            <span v-else>{{ scope.row.requestedQty }}</span>
+            <span v-else>{{ formatQuantity(scope.row.requestedQty) }}</span>
           </template>
         </el-table-column>
-        <el-table-column v-if="mode === 'ship'" label="本次发货" width="110">
+        <el-table-column v-if="mode === 'ship'" label="已发数量" width="80">
+          <template #default="scope">
+            {{ formatQuantity(scope.row.shippedQtyTotal) }}
+          </template>
+        </el-table-column>
+        <el-table-column v-if="mode === 'ship'" width="110">
+          <template #header>
+            <span><span style="color: #f56c6c">*</span> 本次发货</span>
+          </template>
           <template #default="scope">
             <el-input-number
               v-model="scope.row._shipQty"
               :min="0"
               :max="(scope.row.requestedQty || 0) - (scope.row.shippedQtyTotal || 0)"
+              :precision="2"
+              :step="0.01"
+              placeholder="必填"
               size="small"
               controls-position="right"
               style="width: 100%"
@@ -211,22 +231,10 @@
             <span v-else>-</span>
           </template>
         </el-table-column>
-        <el-table-column v-if="mode === 'ship'" label="已发数量" width="80">
-          <template #default="scope">
-            {{ scope.row.shippedQtyTotal || 0 }}
-          </template>
-        </el-table-column>
         <el-table-column label="备注" min-width="120">
           <template #default="scope">
             <el-input v-if="!isReadonly" v-model="scope.row._remark" size="small" placeholder="选填" />
             <span v-else>{{ scope.row._remark || '-' }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column v-if="!isReadonly" label="操作" width="70">
-          <template #default="scope">
-            <el-button link type="danger" size="small" @click="removeItem(scope.$index)">
-              删除
-            </el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -290,7 +298,10 @@
                     <template #default="scope">{{ scope.row.basNo || '-' }}</template>
                   </el-table-column>
                   <el-table-column label="需求数量" width="90">
-                    <template #default="scope">{{ scope.row.requestedQty ?? '-' }}</template>
+                    <template #default="scope">{{ formatQuantity(scope.row.requestedQty) }}</template>
+                  </el-table-column>
+                  <el-table-column label="发货数量" min-width="80">
+                    <template #default="scope">{{ formatQuantity(scope.row.quantityShipped) }}</template>
                   </el-table-column>
                   <el-table-column label="供应商" min-width="130" show-overflow-tooltip>
                     <template #default="scope">{{ scope.row.vendor || '-' }}</template>
@@ -307,7 +318,6 @@
                   <el-table-column label="过期日期" width="110">
                     <template #default="scope">{{ scope.row.expirationDate ? formatDate(scope.row.expirationDate) : '-' }}</template>
                   </el-table-column>
-                  <el-table-column label="发货数量" prop="quantityShipped" min-width="80" />
                 </el-table>
               </div>
             </template>
@@ -372,7 +382,10 @@
                     <template #default="scope">{{ scope.row.basNo || '-' }}</template>
                   </el-table-column>
                   <el-table-column label="需求数量" width="90">
-                    <template #default="scope">{{ scope.row.requestedQty ?? '-' }}</template>
+                    <template #default="scope">{{ formatQuantity(scope.row.requestedQty) }}</template>
+                  </el-table-column>
+                  <el-table-column label="发货数量" min-width="80">
+                    <template #default="scope">{{ formatQuantity(scope.row.quantityShipped) }}</template>
                   </el-table-column>
                   <el-table-column label="供应商" min-width="130" show-overflow-tooltip>
                     <template #default="scope">{{ scope.row.vendor || '-' }}</template>
@@ -389,7 +402,6 @@
                   <el-table-column label="过期日期" width="110">
                     <template #default="scope">{{ scope.row.expirationDate ? formatDate(scope.row.expirationDate) : '-' }}</template>
                   </el-table-column>
-                  <el-table-column label="发货数量" prop="quantityShipped" min-width="80" />
                 </el-table>
               </div>
             </template>
@@ -673,6 +685,12 @@ const dialogTitle = computed(() => {
 })
 
 const isReadonly = computed(() => mode.value === 'view' || mode.value === 'ship')
+
+/** 申请明细数量统一按两位小数展示。 */
+const formatQuantity = (value?: number | null) => {
+  const quantity = Number(value)
+  return Number.isFinite(quantity) ? quantity.toFixed(2) : '-'
+}
 
 // 发货方电话选项：按当前区域（上海/宁波）只显示本区域号码
 const consignorPhoneOptions = computed(() => {
@@ -977,8 +995,8 @@ const addItem = () => {
     storageTempArr: [] as string[],
     storageLocation: '',
     expirationDate: '',
-    requestedQty: 1,
-    shippedQtyTotal: 0
+    requestedQty: 1.00,
+    shippedQtyTotal: 0.00
   } as ReagentApi.ReagentApplyItemVO
   formData.items!.push(item)
 }
@@ -1060,7 +1078,7 @@ const open = async (m: string, id?: number) => {
       // 明细行：附加编辑用 storageTempArr（多选数组）与 ship 模式临时 _shipQty
       formData.items = (data.items || []).map((item: any) => ({
         ...item,
-        _shipQty: 0,
+        _shipQty: undefined,
         storageTempArr: splitStorageTemp(item.storageTemp)
       }))
     } catch {
@@ -1174,7 +1192,7 @@ const handleConfirmShip = async () => {
       quantityShipped: item._shipQty
     }))
   if (shipmentItems.length === 0) {
-    message.warning('请至少填写一项本次发货数量')
+    message.warning('本次发货数量为必填项，请至少填写一项大于 0 的数量')
     return
   }
 

@@ -9,6 +9,12 @@
         <el-form-item label="接收单位" prop="receiverUnit">
           <el-input v-model="queryParams.receiverUnit" placeholder="请输入接收单位" clearable @keyup.enter="handleQuery" />
         </el-form-item>
+        <el-form-item label="物流单号" prop="trackingNumber">
+          <el-input v-model="queryParams.trackingNumber" placeholder="请输入物流单号" clearable @keyup.enter="handleQuery" />
+        </el-form-item>
+        <el-form-item label="试剂名称" prop="reagentName">
+          <el-input v-model="queryParams.reagentName" placeholder="请输入试剂名称" clearable @keyup.enter="handleQuery" />
+        </el-form-item>
         <el-form-item label="状态" prop="status">
           <el-select v-model="queryParams.status" placeholder="请选择状态" clearable class="!w-150px">
             <el-option label="草稿" :value="0" />
@@ -113,6 +119,8 @@ const queryParams = reactive({
   pageSize: 15,
   applyNo: '',
   receiverUnit: '',
+  trackingNumber: '',
+  reagentName: '',
   status: undefined as number | undefined
 })
 
@@ -135,6 +143,8 @@ const handleQuery = () => {
 const resetQuery = () => {
   queryParams.applyNo = ''
   queryParams.receiverUnit = ''
+  queryParams.trackingNumber = ''
+  queryParams.reagentName = ''
   queryParams.status = undefined
   handleQuery()
 }

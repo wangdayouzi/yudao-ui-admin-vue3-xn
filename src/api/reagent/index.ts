@@ -205,15 +205,75 @@ export interface ReagentLabelPrintVO {
   name?: string // 名称
   basId?: string // BASID
   batchNo?: string // 批号
+  storageLocation?: string // 存储位置（SQL Server：sdpm027.pm02726）
   expireDate?: string // 过期日期
 }
 
-/** 根据 BASID 查询试剂标签信息（BASID 必填） */
-export const getLabelPrintByBasId = (basId: string) => {
-  return request.get({ url: '/reagent/label-print/query', params: { basId } })
+/** 根据 BASID 分页查询试剂标签信息（服务端每页固定 5 条） */
+export const getLabelPrintByBasId = (params: { basId: string; pageNo: number }): Promise<PageResult<ReagentLabelPrintVO[]>> => {
+  return request.get({ url: '/reagent/label-print/query', params })
 }
 
 /** 生成试剂标签打印 Excel（键值对表格），返回 Blob */
 export const printLabelPrint = (data: any) => {
   return request.postOriginal({ url: '/reagent/label-print/print', data, responseType: 'blob' })
+}
+
+/** 逻辑标签打印机：用户只能选择后台已配置的打印机，不能传 Windows 队列名。 */
+export interface ReagentLabelPrinterVO {
+  id: number
+  name: string
+  model?: string
+  tapeWidthMm?: number
+  templateCode?: string
+  /** 0 离线，1 在线，2 故障 */
+  onlineStatus?: number
+}
+
+/** 用户可手动选择的固定标签模板，不做版本管理。 */
+export interface ReagentLabelTemplateVO {
+  id: number
+  name: string
+  code: string
+}
+
+export interface ReagentLabelPrintJobVO {
+  id: number
+  jobNo?: string
+  printerId: number
+  templateCode?: string
+  copies: number
+  printedCount?: number
+  /** 0 排队，1 已领取，2 打印中，3 成功，4 失败，5 已取消 */
+  status: number
+  errorCode?: string
+  errorMessage?: string
+  createTime?: string
+  completedTime?: string
+}
+
+export const getLabelPrinters = (): Promise<ReagentLabelPrinterVO[]> => {
+  return request.get({ url: '/reagent/label-print/printers' })
+}
+
+export const getLabelTemplates = (): Promise<ReagentLabelTemplateVO[]> => {
+  return request.get({ url: '/reagent/label-print/templates' })
+}
+
+export const createLabelPrintJob = (data: {
+  printerId: number
+  templateCode: string
+  copies: number
+  label: Record<string, any>
+}): Promise<number> => {
+  return request.post({ url: '/reagent/label-print/jobs', data })
+}
+
+export const getLabelPrintJob = (id: number): Promise<ReagentLabelPrintJobVO> => {
+  return request.get({ url: '/reagent/label-print/jobs/get', params: { id } })
+}
+
+/** 获得最近 20 条试剂标签打印历史 */
+export const getRecentLabelPrintJobs = (): Promise<ReagentLabelPrintJobVO[]> => {
+  return request.get({ url: '/reagent/label-print/jobs/recent' })
 }
