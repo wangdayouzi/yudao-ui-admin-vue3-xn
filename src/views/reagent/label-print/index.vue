@@ -58,7 +58,16 @@
 
     <!-- ============ 打印标签表单 ============ -->
     <ContentWrap v-if="selectedRow">
-      <div class="section-title">打印标签信息</div>
+      <div class="section-title-row">
+        <div class="section-title">打印标签信息</div>
+        <el-alert
+          class="label-print-notice"
+          title="请在连接标签打印机的电脑上打印；务必先确认标签打印机内的纸张宽度正确。未出纸请查看打印历史"
+          type="warning"
+          :closable="false"
+          show-icon
+        />
+      </div>
       <el-form :model="printForm" label-width="100px" style="max-width: 640px">
         <el-form-item label="打印机" required>
           <el-select v-model="printForm.printerId" :loading="printerLoading" placeholder="请选择标签打印机" style="width: 100%" @change="cachePrinterSelection">
@@ -476,7 +485,20 @@ const handleLabelPrint = async () => {
 .section-title {
   font-weight: bold;
   font-size: 15px;
+  white-space: nowrap;
+}
+
+.section-title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   margin-bottom: 12px;
+}
+
+.label-print-notice {
+  width: auto;
+  flex: 1;
+  min-width: 0;
 }
 
 .form-tip {
