@@ -53,6 +53,20 @@ router.beforeEach(async (to, from) => {
   start()
   loadStart()
 
+  // 钉钉 OAuth 首次设密回调会落在任意前端路径；统一转到登录页展示设置密码弹窗。
+  const passwordSetupToken = to.query.passwordSetupToken as string
+  if (to.path !== '/login' && to.query.passwordSetupRequired === 'true' && passwordSetupToken) {
+    return {
+      path: '/login',
+      query: {
+        passwordSetupRequired: 'true',
+        passwordSetupToken,
+        redirect: to.path
+      },
+      replace: true
+    }
+  }
+
   // 钉钉OAuth回调携带token参数，提取并存储后清除URL参数
   const tokenParam = to.query.token as string
   if (tokenParam) {

@@ -243,6 +243,7 @@ export interface ReagentLabelPrintJobVO {
   printerId: number
   templateCode?: string
   copies: number
+  printCutMode?: string
   printedCount?: number
   /** 0 排队，1 已领取，2 打印中，3 成功，4 失败，5 已取消 */
   status: number
@@ -264,6 +265,7 @@ export const createLabelPrintJob = (data: {
   printerId: number
   templateCode: string
   copies: number
+  printCutMode: string
   label: Record<string, any>
 }): Promise<number> => {
   return request.post({ url: '/reagent/label-print/jobs', data })

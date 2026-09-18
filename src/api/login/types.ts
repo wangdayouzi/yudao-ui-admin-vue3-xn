@@ -15,6 +15,8 @@ export type TokenType = {
   userType: number //用户类型
   clientId: string //客户端编号
   expiresTime: number //过期时间
+  passwordSetupRequired?: boolean // 是否需要首次设置本地密码
+  passwordSetupToken?: string // 首次设置本地密码的一次性凭证
 }
 
 export type UserVO = {

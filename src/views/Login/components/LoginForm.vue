@@ -111,6 +111,43 @@
       </el-col>
     </el-row>
   </el-form>
+  <el-dialog
+    v-model="passwordSetupVisible"
+    title="设置本地账户密码"
+    width="420px"
+    :close-on-click-modal="false"
+    :close-on-press-escape="false"
+    :show-close="false"
+  >
+    <p class="mb-18px text-14px text-gray-500">
+      为保障账户安全，请先设置本地账户密码。以后可使用账号和该密码登录。
+    </p>
+    <el-form label-position="top">
+      <el-form-item label="新密码" required>
+        <el-input
+          v-model="passwordSetupForm.password"
+          type="password"
+          show-password
+          placeholder="请输入 4-16 位密码"
+          @keyup.enter="submitPasswordSetup"
+        />
+      </el-form-item>
+      <el-form-item label="确认新密码" required>
+        <el-input
+          v-model="passwordSetupForm.confirmPassword"
+          type="password"
+          show-password
+          placeholder="请再次输入新密码"
+          @keyup.enter="submitPasswordSetup"
+        />
+      </el-form-item>
+    </el-form>
+    <template #footer>
+      <el-button type="primary" :loading="passwordSetupLoading" @click="submitPasswordSetup">
+        确认并登录
+      </el-button>
+    </template>
+  </el-dialog>
 </template>
 <script lang="ts" setup>
 import { ElLoading } from 'element-plus'
@@ -140,6 +177,13 @@ const redirect = ref<string>('')
 const loginLoading = ref(false)
 const verify = ref()
 const captchaType = ref('blockPuzzle') // blockPuzzle 滑块 clickWord 点击文字 pictureWord 文字验证码
+const passwordSetupVisible = ref(false)
+const passwordSetupLoading = ref(false)
+const passwordSetupToken = ref('')
+const passwordSetupForm = reactive({
+  password: '',
+  confirmPassword: ''
+})
 
 const getShow = computed(() => unref(getLoginState) === LoginStateEnum.LOGIN)
 
@@ -204,6 +248,52 @@ const getTenantByWebsite = async () => {
   }
 }
 const loading = ref() // ElLoading.service 返回的实例
+
+const showPasswordSetup = (token: string) => {
+  if (!token) {
+    message.error('设置密码凭证无效，请重新登录')
+    return
+  }
+  passwordSetupToken.value = token
+  passwordSetupForm.password = ''
+  passwordSetupForm.confirmPassword = ''
+  passwordSetupVisible.value = true
+}
+
+const completeLogin = async (res: any) => {
+  authUtil.setToken(res)
+  if (!redirect.value) {
+    redirect.value = '/'
+  }
+  if (redirect.value.indexOf('sso') !== -1) {
+    window.location.href = window.location.href.replace('/login?redirect=', '')
+  } else {
+    await push({ path: redirect.value || permissionStore.addRouters[0].path })
+  }
+}
+
+const submitPasswordSetup = async () => {
+  if (passwordSetupForm.password.length < 4 || passwordSetupForm.password.length > 16) {
+    message.warning('密码长度为 4-16 位')
+    return
+  }
+  if (passwordSetupForm.password !== passwordSetupForm.confirmPassword) {
+    message.warning('两次输入的密码不一致')
+    return
+  }
+  passwordSetupLoading.value = true
+  try {
+    const res = await LoginApi.initializeDingTalkPassword({
+      passwordSetupToken: passwordSetupToken.value,
+      password: passwordSetupForm.password
+    })
+    passwordSetupVisible.value = false
+    await completeLogin(res)
+  } finally {
+    passwordSetupLoading.value = false
+  }
+}
+
 // 登录
 const handleLogin = async (params: any) => {
   loginLoading.value = true
@@ -219,6 +309,10 @@ const handleLogin = async (params: any) => {
     if (!res) {
       return
     }
+    if (res.passwordSetupRequired) {
+      showPasswordSetup(res.passwordSetupToken)
+      return
+    }
     loading.value = ElLoading.service({
       lock: true,
       text: '正在加载系统中...',
@@ -229,19 +323,10 @@ const handleLogin = async (params: any) => {
     } else {
       authUtil.removeLoginForm()
     }
-    authUtil.setToken(res)
-    if (!redirect.value) {
-      redirect.value = '/'
-    }
-    // 判断是否为SSO登录
-    if (redirect.value.indexOf('sso') !== -1) {
-      window.location.href = window.location.href.replace('/login?redirect=', '')
-    } else {
-      await push({ path: redirect.value || permissionStore.addRouters[0].path })
-    }
+    await completeLogin(res)
   } finally {
     loginLoading.value = false
-    loading.value.close()
+    loading.value?.close()
   }
 }
 
@@ -309,6 +394,24 @@ watch(
   {
     immediate: true
   }
+)
+watch(
+  () => [currentRoute.value.query.passwordSetupRequired, currentRoute.value.query.passwordSetupToken],
+  ([required, token]) => {
+    if (required === 'true' && typeof token === 'string') {
+      showPasswordSetup(token)
+    }
+  },
+  { immediate: true }
+)
+watch(
+  () => currentRoute.value.query.error,
+  (error) => {
+    if (typeof error === 'string' && error) {
+      message.error(error)
+    }
+  },
+  { immediate: true }
 )
 onMounted(() => {
   getLoginFormCache()

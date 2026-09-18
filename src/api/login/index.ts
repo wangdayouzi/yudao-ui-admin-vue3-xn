@@ -80,6 +80,11 @@ export const socialAuthRedirect = (type: number, redirectUri: string) => {
 export const dingtalkOAuth2AuthorizeUrl = () => {
   return request.get({ url: '/system/auth/dingtalk/authorize-url' })
 }
+
+// 钉钉认证或首次本地登录后，设置本地账户密码
+export const initializeDingTalkPassword = (data: { passwordSetupToken: string; password: string }) => {
+  return request.post({ url: '/system/auth/dingtalk/initialize-password', data })
+}
 // 获取验证图片以及 token
 export const getCode = (data: any) => {
   return request.postOriginal({ url: 'system/captcha/get', data })

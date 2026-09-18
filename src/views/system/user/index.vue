@@ -47,6 +47,15 @@
               class="!w-240px"
             />
           </el-form-item>
+          <el-form-item label="员工工号" prop="employeeNo">
+            <el-input
+              v-model="queryParams.employeeNo"
+              placeholder="请输入员工工号"
+              clearable
+              @keyup.enter="handleQuery"
+              class="!w-240px"
+            />
+          </el-form-item>
           <el-form-item label="状态" prop="status">
             <el-select
               v-model="queryParams.status"
@@ -126,6 +135,12 @@
             label="用户昵称"
             align="center"
             prop="nickname"
+            :show-overflow-tooltip="true"
+          />
+          <el-table-column
+            label="员工工号"
+            align="center"
+            prop="employeeNo"
             :show-overflow-tooltip="true"
           />
           <el-table-column
@@ -244,6 +259,7 @@ const queryParams = reactive({
   username: undefined,
   mobile: undefined,
   nickname: undefined,
+  employeeNo: undefined,
   status: undefined,
   deptId: undefined as number | undefined,
   createTime: []

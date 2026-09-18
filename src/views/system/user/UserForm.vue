@@ -40,6 +40,13 @@
       </el-row>
       <el-row>
         <el-col :span="12">
+          <el-form-item label="员工工号" prop="employeeNo">
+            <el-input v-model="formData.employeeNo" maxlength="64" placeholder="请输入员工工号" />
+          </el-form-item>
+        </el-col>
+      </el-row>
+      <el-row>
+        <el-col :span="12">
           <el-form-item v-if="formData.id === undefined" label="用户名称" prop="username">
             <el-input v-model="formData.username" placeholder="请输入用户名称" />
           </el-form-item>
@@ -115,6 +122,7 @@ const formLoading = ref(false) // 表单的加载中：1）修改时的数据加
 const formType = ref('') // 表单的类型：create - 新增；update - 修改
 const formData = ref({
   nickname: '',
+  employeeNo: '',
   deptId: '',
   mobile: '',
   email: '',
@@ -202,6 +210,7 @@ const submitForm = async () => {
 const resetForm = () => {
   formData.value = {
     nickname: '',
+    employeeNo: '',
     deptId: '',
     mobile: '',
     email: '',

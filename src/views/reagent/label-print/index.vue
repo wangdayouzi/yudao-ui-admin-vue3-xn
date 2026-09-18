@@ -89,6 +89,14 @@
         <el-form-item label="打印份数" required>
           <el-input-number v-model="printForm.copies" :min="1" :max="50" />
         </el-form-item>
+        <el-form-item label="裁切方式" required>
+          <el-checkbox-group v-model="printForm.printCutOptions" @change="cachePrintCutOptions">
+            <el-checkbox label="AUTO_CUT">自动裁切</el-checkbox>
+            <el-checkbox label="HALF_CUT">半剪切</el-checkbox>
+            <el-checkbox label="CHAIN">链式打印</el-checkbox>
+          </el-checkbox-group>
+          <div class="form-tip">与 P-touch 的裁切选项一致，三个选项可组合；均不选时使用打印机默认设置。</div>
+        </el-form-item>
         <el-form-item label="名称" prop="name">
           <el-input v-model="printForm.name" placeholder="可修改" />
         </el-form-item>
@@ -161,6 +169,9 @@
         </el-table-column>
         <el-table-column label="份数" width="70">
           <template #default="{ row }">{{ row.printedCount || 0 }}/{{ row.copies }}</template>
+        </el-table-column>
+        <el-table-column label="裁切方式" min-width="130">
+          <template #default="{ row }">{{ printCutModeName(row.printCutMode) }}</template>
         </el-table-column>
         <el-table-column label="状态" width="94">
           <template #default="{ row }">
@@ -254,6 +265,7 @@ const printForm = reactive({
   printerId: undefined as number | undefined,
   templateCode: '',
   copies: 1,
+  printCutOptions: ['HALF_CUT', 'CHAIN'] as string[],
   name: '',
   basId: '',
   batchNo: '',
@@ -287,6 +299,14 @@ const templateStorageKey = () => `reagent-label-print:last-template:${userStore.
 
 const cacheTemplateSelection = (templateCode: string) => {
   window.localStorage.setItem(templateStorageKey(), templateCode)
+}
+
+const printCutOptionsStorageKey = () => `reagent-label-print:last-cut-options:${userStore.getUser?.id || 'anonymous'}`
+
+const normalizePrintCutOptions = (options: string[]) => ['AUTO_CUT', 'HALF_CUT', 'CHAIN'].filter((option) => options.includes(option))
+
+const cachePrintCutOptions = () => {
+  window.localStorage.setItem(printCutOptionsStorageKey(), JSON.stringify(normalizePrintCutOptions(printForm.printCutOptions)))
 }
 
 const loadPrinters = async () => {
@@ -335,8 +355,34 @@ const loadTemplates = async () => {
   }
 }
 
+const loadPrintCutOptions = () => {
+  const cachedOptions = window.localStorage.getItem(printCutOptionsStorageKey())
+  if (!cachedOptions) return
+  try {
+    const options = JSON.parse(cachedOptions)
+    if (Array.isArray(options)) {
+      printForm.printCutOptions = normalizePrintCutOptions(options)
+    }
+  } catch {
+    // 旧版本缓存的是单一模式字符串，忽略即可，继续用默认“半剪切 + 链式”。
+  }
+}
+
 const printerNameOf = (printerId?: number) => printers.value.find((item) => item.id === printerId)?.name || `打印机 #${printerId ?? '-'}`
 const templateNameOf = (templateCode?: string) => templates.value.find((item) => item.code === templateCode)?.name || templateCode || '-'
+const printCutModeName = (printCutMode?: string) => {
+  if (printCutMode?.includes('|')) {
+    return printCutMode.split('|').map((item) => printCutModeName(item)).join(' + ')
+  }
+  return ({
+  DEFAULT: '打印机默认',
+  AUTO_CUT: '自动全切',
+  HALF_CUT: '半剪切',
+  CHAIN: '链式不切',
+  HALF_CUT_CHAIN: '半剪切链式',
+  NO_CUT: '不裁切'
+  }[printCutMode || 'DEFAULT'] || printCutMode || '-')
+}
 const formatHistoryTime = (time?: string) => time ? dayjs(time).format('YYYY-MM-DD HH:mm:ss') : '-'
 const jobStatusText = (status?: number) => {
   const map: Record<number, string> = { 0: '待领取', 1: '已领取', 2: '打印中', 3: '成功', 4: '失败', 5: '已取消' }
@@ -363,6 +409,7 @@ const openPrintHistory = async () => {
 }
 
 onMounted(() => {
+  loadPrintCutOptions()
   loadPrinters()
   loadTemplates()
 })
@@ -385,6 +432,7 @@ const resetPrintForm = () => {
     printerId: printForm.printerId,
     templateCode: printForm.templateCode,
     copies: 1,
+    printCutOptions: printForm.printCutOptions,
     name: '',
     basId: '',
     batchNo: '',
@@ -470,8 +518,9 @@ const handleLabelPrint = async () => {
   }
   jobSubmitting.value = true
   try {
-    const { printerId, templateCode, copies, receiverId: _receiverId, ...label } = printForm
-    const jobId = await ReagentApi.createLabelPrintJob({ printerId, templateCode, copies, label })
+    const { printerId, templateCode, copies, printCutOptions, receiverId: _receiverId, ...label } = printForm
+    const printCutMode = normalizePrintCutOptions(printCutOptions).join('|') || 'DEFAULT'
+    const jobId = await ReagentApi.createLabelPrintJob({ printerId, templateCode, copies, printCutMode, label })
     message.success(`打印任务已提交（任务 ID：${jobId}）`)
   } catch {
     message.error('提交打印任务失败')
