@@ -76,7 +76,7 @@ import { UploadFile } from 'element-plus/es/components/upload/src/upload'
 defineOptions({ name: 'UploadFile' })
 
 const message = useMessage() // 消息弹窗
-const emit = defineEmits(['update:modelValue'])
+const emit = defineEmits(['update:modelValue', 'update:fileSize'])
 
 const props = defineProps({
   modelValue: propTypes.oneOfType<string | string[]>([String, Array<String>]).isRequired,
@@ -148,6 +148,7 @@ const beforeUpload: UploadProps['beforeUpload'] = (file: UploadRawFile) => {
 const handleFileSuccess: UploadProps['onSuccess'] = (res: any, file): void => {
   message.success('上传成功')
   const response = res as { data: string }
+  const fileSize = file.raw?.size
   // 删除 el-upload 维护的待上传项。文件 URL 是存储地址，不能作为展示文件名。
   const index = fileList.value.findIndex((item) => item.uid === file.uid)
   if (index > -1) {
@@ -159,6 +160,7 @@ const handleFileSuccess: UploadProps['onSuccess'] = (res: any, file): void => {
     uploadList.value = []
     uploadNumber.value = 0
     emitUpdateModelValue()
+    emit('update:fileSize', fileSize)
   }
 }
 // 文件数超出提示
@@ -177,6 +179,7 @@ const handleRemove = (file: UploadFile) => {
   if (index > -1) {
     fileList.value.splice(index, 1)
     emitUpdateModelValue()
+    emit('update:fileSize', undefined)
   }
 }
 const handlePreview: UploadProps['onPreview'] = (uploadFile) => {

@@ -45,7 +45,8 @@ const whiteList = [
   '/auth-redirect',
   '/bind',
   '/register',
-  '/oauthLogin/gitee'
+  '/oauthLogin/gitee',
+  '/pms/kb/document/share'
 ]
 
 // 路由加载前
@@ -119,7 +120,7 @@ router.beforeEach(async (to, from) => {
       }
     }
   } else {
-    if (whiteList.indexOf(to.path) !== -1) {
+    if (whiteList.some((path) => to.path === path || to.path.startsWith(`${path}/`))) {
       return true
     } else {
       return `/login?redirect=${encodeURIComponent(to.fullPath)}` // 否则全部重定向到登录页
