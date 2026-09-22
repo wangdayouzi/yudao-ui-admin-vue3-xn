@@ -33,7 +33,7 @@ let requestList: any[] = []
 // 是否正在刷新中
 let isRefreshToken = false
 // 请求白名单，无须 token 的接口
-const whiteList: string[] = ['/login', '/refresh-token']
+const whiteList: string[] = ['/login', '/refresh-token', '/reagent/sample-loan/screen-list']
 
 // 创建axios实例
 const service: AxiosInstance = axios.create({

@@ -46,7 +46,9 @@ const whiteList = [
   '/bind',
   '/register',
   '/oauthLogin/gitee',
-  '/pms/kb/document/share'
+  '/pms/kb/document/share',
+  // 独立样品看板：电视端直接打开，不要求登录
+  '/reagent/sample-loan-screen'
 ]
 
 // 路由加载前
