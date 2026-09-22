@@ -265,7 +265,19 @@ const navLinks: NavItem[] = [
   { name: '上海表单填写', url: 'http://192.168.11.89:3838/accurant/', icon: 'ep:edit', color: '#13c2c2' },
   { name: '匿名信箱', url: 'http://192.168.20.100/upload/open.php', icon: 'ep:chat-dot-round', color: '#fa541c' },
   { name: '投诉信箱', url: 'http://192.168.20.100/upload/mail.php', icon: 'ep:warning', color: '#f5222d' },
-  { name: '遗传办备案截图', url: 'https://alidocs.dingtalk.com/i/spaces/ZRPG2y5ojZ1DKmBp/overview', icon: 'ep:camera', color: '#52c41a' }
+  { name: '遗传办备案截图', url: 'https://alidocs.dingtalk.com/i/spaces/ZRPG2y5ojZ1DKmBp/overview', icon: 'ep:camera', color: '#52c41a' },
+  {
+    name: '上海研究记录本打印系统',
+    url: 'http://192.168.20.64/login/ad?redirect=/index',
+    icon: 'ep:printer',
+    color: '#1677ff'
+  },
+  {
+    name: '宁波研究记录本打印系统',
+    url: 'http://192.168.10.80/login/ad?redirect=/index',
+    icon: 'ep:printer',
+    color: '#9254de'
+  }
 ]
 
 const handleNavClick = (url: string) => {
