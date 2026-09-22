@@ -26,6 +26,22 @@ export interface ReagentBaseFlatVO {
   syncTime?: string
 }
 
+/** 样品领用台账（独立于试剂库存和 LIMS） */
+export interface SampleLoanVO {
+  id: number
+  basNo: string
+  requesterId?: number
+  requester: string
+  submitterId?: number
+  submitter?: string
+  sampleInfo?: string
+  remark?: string
+  /** 1-领用中；2-已归还 */
+  status: number
+  createTime?: string
+  returnTime?: string
+}
+
 /** 申请单 */
 export interface ReagentApplyVO {
   id?: number
@@ -116,12 +132,40 @@ export const deleteBaseFlat = (id: number) => {
 
 // 生成生物试剂接收单（docx）
 export const generateBaseReceipt = (data: any) => {
-  return request.postOriginal({ url: '/reagent/base-flat/generate-receipt', data, responseType: 'blob' })
+  return request.postOriginal({
+    url: '/reagent/base-flat/generate-receipt',
+    data,
+    responseType: 'blob'
+  })
 }
 
 // 手动触发试剂全链路同步（erpSync + erpPush + 扁平；2 分钟内限一次）
 export const syncReagentChain = (param?: string) => {
   return request.post({ url: '/mes/erp-reagent/sync', params: { param } })
+}
+
+// ==================== 样品领用台账 API ====================
+
+export const getSampleLoanPage = (params: any): Promise<PageResult<SampleLoanVO[]>> => {
+  return request.get({ url: '/reagent/sample-loan/page', params })
+}
+
+export const createSampleLoan = (
+  data: Pick<
+    SampleLoanVO,
+    'basNo' | 'requesterId' | 'requester' | 'submitterId' | 'submitter' | 'sampleInfo' | 'remark'
+  >
+) => {
+  return request.post({ url: '/reagent/sample-loan/create', data })
+}
+
+export const returnSampleLoan = (id: number) => {
+  return request.put({ url: '/reagent/sample-loan/return', params: { id } })
+}
+
+/** 大屏仅显示仍在领用中的记录 */
+export const getBorrowingSampleLoanList = (): Promise<SampleLoanVO[]> => {
+  return request.get({ url: '/reagent/sample-loan/screen-list' })
 }
 
 // ==================== 申请单 API ====================
@@ -210,7 +254,10 @@ export interface ReagentLabelPrintVO {
 }
 
 /** 根据 BASID 分页查询试剂标签信息（服务端每页固定 5 条） */
-export const getLabelPrintByBasId = (params: { basId: string; pageNo: number }): Promise<PageResult<ReagentLabelPrintVO[]>> => {
+export const getLabelPrintByBasId = (params: {
+  basId: string
+  pageNo: number
+}): Promise<PageResult<ReagentLabelPrintVO[]>> => {
   return request.get({ url: '/reagent/label-print/query', params })
 }
 

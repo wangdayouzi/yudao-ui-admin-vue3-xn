@@ -1122,6 +1122,18 @@ const remainingRouter: AppRouteRecordRaw[] = [
       canTo: true,
       title: '预览分析方法文件'
     }
+  },
+  {
+    // 独立全屏看板：不作为系统菜单，也不带后台布局、面包屑或标签页。
+    path: '/reagent/sample-loan-screen',
+    component: () => import('@/views/reagent/sample-loan/screen.vue'),
+    name: 'ReagentSampleLoanScreen',
+    meta: {
+      hidden: true,
+      canTo: true,
+      noTagsView: true,
+      title: '样品领用看板'
+    }
   }
 ]
 
