@@ -27,9 +27,9 @@
           <strong class="bas-value">{{ row.basNo }}</strong>
           <strong class="requester-value">{{ row.requester }}</strong>
         </article>
-        <div v-if="!loading && pageList.length === 0" class="empty-state"
-          >当前 24 小时内没有样品记录</div
-        >
+        <div v-if="!loading && pageList.length === 0" class="empty-state">
+          {{ dataUnavailable ? '数据暂不可用，正在重试…' : '当前 24 小时内没有样品记录' }}
+        </div>
       </div>
       <footer class="panel-footer">
         <span>自动翻页</span>
@@ -57,6 +57,7 @@ defineOptions({ name: 'ReagentSampleLoanScreen' })
 
 const PAGE_SIZE = 24
 const loading = ref(false)
+const dataUnavailable = ref(false)
 const isDark = ref(false)
 const list = ref<ReagentApi.SampleLoanVO[]>([])
 const nowText = ref('')
@@ -81,6 +82,10 @@ const getList = async () => {
       return timeDiff || b.id - a.id
     })
     if (pageNo.value >= pageCount.value) pageNo.value = 0
+    dataUnavailable.value = false
+  } catch {
+    // 大屏只读接口异常时保留最后一次成功数据，不打断时钟和翻页。
+    dataUnavailable.value = list.value.length === 0
   } finally {
     loading.value = false
   }
@@ -128,7 +133,7 @@ onBeforeUnmount(() => {
   height: 100vh;
   min-width: 100vw;
   min-height: 100vh;
-  padding: clamp(20px, 3vh, 42px) clamp(20px, 3vw, 56px) clamp(18px, 2.5vh, 38px);
+  padding: clamp(16px, 2vh, 30px) clamp(20px, 3vw, 56px) clamp(12px, 1.5vh, 24px);
   overflow: hidden;
   color: var(--text-primary);
   background:
@@ -214,10 +219,10 @@ onBeforeUnmount(() => {
 
 .screen-header {
   display: flex;
-  min-height: clamp(126px, 19vh, 280px);
+  min-height: clamp(126px, 20.5vh, 300px);
   align-items: stretch;
   justify-content: space-between;
-  padding: 0 0 18px;
+  padding: 0 0 10px;
   box-sizing: border-box;
 }
 
@@ -300,7 +305,7 @@ onBeforeUnmount(() => {
   strong {
     margin-top: 5px;
     font-family: 'DIN Alternate', Bahnschrift, sans-serif;
-    font-size: clamp(48px, min(7.2vw, calc(9.26vw - 39px)), 250px);
+    font-size: clamp(48px, min(7.5vw, calc(9.5vw - 39px)), 250px);
     font-weight: 800;
     line-height: 1;
     letter-spacing: 1px;
@@ -383,6 +388,7 @@ onBeforeUnmount(() => {
     grid-template-columns: minmax(0, 1.65fr) minmax(90px, 1fr);
     gap: 12px;
     align-items: center;
+    justify-items: center;
   }
 }
 
@@ -441,16 +447,19 @@ onBeforeUnmount(() => {
 
 .bas-value,
 .requester-value {
+  width: 100%;
   overflow: hidden;
-  font-size: clamp(18px, 1.35vw, 30px);
+  font-size: clamp(24px, 2.1vw, 42px);
+  line-height: 1;
   color: var(--text-primary);
+  text-align: center;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .bas-value {
   font-family: 'DIN Alternate', Bahnschrift, sans-serif;
-  font-size: clamp(22px, 1.7vw, 36px);
+  font-size: clamp(26px, 2.2vw, 44px);
   font-weight: 700;
   letter-spacing: 0.5px;
   color: var(--bas-color);

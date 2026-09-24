@@ -165,7 +165,10 @@ export const returnSampleLoan = (id: number) => {
 
 /** 大屏仅显示仍在领用中的记录 */
 export const getBorrowingSampleLoanList = (): Promise<SampleLoanVO[]> => {
-  return request.get({ url: '/reagent/sample-loan/screen-list' })
+  return request.get({
+    url: '/reagent/sample-loan/screen-list',
+    headers: { silentError: true }
+  })
 }
 
 // ==================== 申请单 API ====================

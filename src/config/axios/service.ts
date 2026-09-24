@@ -110,6 +110,9 @@ service.interceptors.response.use(
   async (response: AxiosResponse<any>) => {
     let { data } = response
     const config = response.config
+    const silentError =
+      (config.headers as any)?.silentError === true ||
+      (config.headers as any)?.silentError === 'true'
     if (!data) {
       // 返回“[HTTP]请求没有返回值”;
       throw new Error()
@@ -150,6 +153,9 @@ service.interceptors.response.use(
       // 如果是忽略的错误码，直接返回 msg 异常
       return Promise.reject(msg)
     } else if (code === 401) {
+      if (silentError) {
+        return Promise.reject(new Error(msg))
+      }
       // 如果未认证，并且未进行刷新令牌，说明可能是访问令牌过期了
       if (!isRefreshToken) {
         isRefreshToken = true
@@ -193,29 +199,32 @@ service.interceptors.response.use(
         })
       }
     } else if (code === 500) {
-      ElMessage.error(t('sys.api.errMsg500'))
+      if (!silentError) ElMessage.error(t('sys.api.errMsg500'))
       return Promise.reject(new Error(msg))
     } else if (code === 901) {
-      ElMessage.error({
-        offset: 300,
-        dangerouslyUseHTMLString: true,
-        message:
-          '<div>' +
-          t('sys.api.errMsg901') +
-          '</div>' +
-          '<div> &nbsp; </div>' +
-          '<div>参考 https://doc.iocoder.cn/ 教程</div>' +
-          '<div> &nbsp; </div>' +
-          '<div>5 分钟搭建本地环境</div>'
-      })
+      if (!silentError) {
+        ElMessage.error({
+          offset: 300,
+          dangerouslyUseHTMLString: true,
+          message:
+            '<div>' +
+            t('sys.api.errMsg901') +
+            '</div>' +
+            '<div> &nbsp; </div>' +
+            '<div>参考 https://doc.iocoder.cn/ 教程</div>' +
+            '<div> &nbsp; </div>' +
+            '<div>5 分钟搭建本地环境</div>'
+        })
+      }
       return Promise.reject(new Error(msg))
     } else if (code !== 0 && code !== 200) {
       if (msg === '无效的刷新令牌') {
+        if (silentError) return Promise.reject(new Error(msg))
         // hard coding：忽略这个提示，直接登出
         console.log(msg)
         return handleAuthorized()
       } else {
-        ElNotification.error({ title: msg })
+        if (!silentError) ElNotification.error({ title: msg })
       }
       return Promise.reject('error')
     } else {
@@ -224,6 +233,9 @@ service.interceptors.response.use(
   },
   (error: AxiosError) => {
     console.log('err' + error) // for debug
+    const silentError =
+      (error.config?.headers as any)?.silentError === true ||
+      (error.config?.headers as any)?.silentError === 'true'
     let { message } = error
     const { t } = useI18n()
     if (message === 'Network Error') {
@@ -233,7 +245,7 @@ service.interceptors.response.use(
     } else if (message.includes('Request failed with status code')) {
       message = t('sys.api.apiRequestFailed') + message.substr(message.length - 3)
     }
-    ElMessage.error(message)
+    if (!silentError) ElMessage.error(message)
     return Promise.reject(error)
   }
 )
