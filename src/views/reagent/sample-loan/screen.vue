@@ -2,20 +2,12 @@
   <main class="sample-loan-screen" :class="{ 'is-dark': isDark }">
     <header class="screen-header">
       <div class="title-block">
-        <h1><span>样品</span><span>领用</span></h1>
+        <h1>可领用列表</h1>
       </div>
       <div class="header-actions">
         <div class="time-card">
           <strong>{{ nowText }}</strong>
         </div>
-        <button
-          class="theme-toggle"
-          type="button"
-          :title="isDark ? '切换为冰川白' : '切换为深海钴蓝'"
-          @click="isDark = !isDark"
-        >
-          <Icon :icon="isDark ? 'ep:sunny' : 'ep:moon'" />
-        </button>
       </div>
     </header>
     <section class="screen-panel">
@@ -28,7 +20,7 @@
           <strong class="requester-value">{{ row.requester }}</strong>
         </article>
         <div v-if="!loading && pageList.length === 0" class="empty-state">
-          {{ dataUnavailable ? '数据暂不可用，正在重试…' : '当前 24 小时内没有样品记录' }}
+          {{ dataUnavailable ? '数据暂不可用，正在重试…' : '当前 24 小时内没有可领用记录' }}
         </div>
       </div>
       <footer class="panel-footer">
@@ -46,6 +38,27 @@
         <span>{{ pageNo + 1 }} / {{ pageCount }}</span>
       </footer>
     </section>
+    <div class="screen-controls">
+      <div class="location-toggle" role="group" aria-label="楼层切换">
+        <button
+          v-for="location in locations"
+          :key="location"
+          type="button"
+          :class="{ active: activeLocation === location }"
+          @click="selectLocation(location)"
+        >
+          {{ location }}
+        </button>
+      </div>
+      <button
+        class="theme-toggle"
+        type="button"
+        :title="isDark ? '切换为冰川白' : '切换为深海钴蓝'"
+        @click="isDark = !isDark"
+      >
+        <Icon :icon="isDark ? 'ep:sunny' : 'ep:moon'" />
+      </button>
+    </div>
   </main>
 </template>
 
@@ -62,9 +75,24 @@ const isDark = ref(false)
 const list = ref<ReagentApi.SampleLoanVO[]>([])
 const nowText = ref('')
 const pageNo = ref(0)
-const pageCount = computed(() => Math.max(Math.ceil(list.value.length / PAGE_SIZE), 1))
+const locations = ['4楼', '8楼'] as const
+type Location = (typeof locations)[number]
+const activeLocation = ref<Location>('4楼')
+const materialTypeRank = { SAMPLE: 0, REAGENT: 1 } as const
+const sortedList = computed(() =>
+  [...list.value]
+    .filter((row) => row.location === activeLocation.value)
+    .sort((a, b) => {
+      const typeDiff =
+        (materialTypeRank[a.materialType] ?? 99) - (materialTypeRank[b.materialType] ?? 99)
+      if (typeDiff !== 0) return typeDiff
+      const timeDiff = dayjs(b.createTime).valueOf() - dayjs(a.createTime).valueOf()
+      return timeDiff || b.id - a.id
+    })
+)
+const pageCount = computed(() => Math.max(Math.ceil(sortedList.value.length / PAGE_SIZE), 1))
 const pageList = computed(() =>
-  list.value.slice(pageNo.value * PAGE_SIZE, (pageNo.value + 1) * PAGE_SIZE)
+  sortedList.value.slice(pageNo.value * PAGE_SIZE, (pageNo.value + 1) * PAGE_SIZE)
 )
 let refreshTimer: ReturnType<typeof setInterval> | undefined
 let clockTimer: ReturnType<typeof setInterval> | undefined
@@ -77,10 +105,7 @@ const getList = async () => {
   loading.value = true
   try {
     const data = await ReagentApi.getBorrowingSampleLoanList()
-    list.value = [...data].sort((a, b) => {
-      const timeDiff = dayjs(b.createTime).valueOf() - dayjs(a.createTime).valueOf()
-      return timeDiff || b.id - a.id
-    })
+    list.value = [...data]
     if (pageNo.value >= pageCount.value) pageNo.value = 0
     dataUnavailable.value = false
   } catch {
@@ -89,6 +114,11 @@ const getList = async () => {
   } finally {
     loading.value = false
   }
+}
+const selectLocation = (location: Location) => {
+  if (activeLocation.value === location) return
+  activeLocation.value = location
+  pageNo.value = 0
 }
 const nextPage = () => {
   if (pageCount.value > 1) pageNo.value = (pageNo.value + 1) % pageCount.value
@@ -322,10 +352,6 @@ onBeforeUnmount(() => {
 }
 
 .theme-toggle {
-  position: fixed;
-  right: clamp(14px, 1.4vw, 26px);
-  bottom: clamp(14px, 2vh, 30px);
-  z-index: 5;
   display: inline-flex;
   width: 42px;
   height: 42px;
@@ -449,7 +475,7 @@ onBeforeUnmount(() => {
 .requester-value {
   width: 100%;
   overflow: hidden;
-  font-size: clamp(24px, 2.1vw, 42px);
+  font-size: clamp(24px, 5vw, 60px);
   line-height: 1;
   color: var(--text-primary);
   text-align: center;
@@ -459,7 +485,7 @@ onBeforeUnmount(() => {
 
 .bas-value {
   font-family: 'DIN Alternate', Bahnschrift, sans-serif;
-  font-size: clamp(26px, 2.2vw, 44px);
+  font-size: clamp(26px, 5vw, 60px);
   font-weight: 700;
   letter-spacing: 0.5px;
   color: var(--bas-color);
@@ -475,6 +501,45 @@ onBeforeUnmount(() => {
   grid-column: 1 / -1;
   align-items: center;
   justify-content: center;
+}
+
+.screen-controls {
+  position: fixed;
+  right: clamp(14px, 1.4vw, 26px);
+  bottom: clamp(14px, 2vh, 30px);
+  z-index: 5;
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  flex-direction: column;
+}
+
+.location-toggle {
+  display: flex;
+  padding: 3px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  box-shadow: 0 14px 32px var(--card-shadow);
+  gap: 3px;
+
+  button {
+    min-width: 42px;
+    height: 28px;
+    padding: 0 8px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    background: transparent;
+    border: 0;
+    border-radius: 5px;
+
+    &.active {
+      color: #fff;
+      background: var(--accent);
+      box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 36%, transparent);
+    }
+  }
 }
 
 .panel-footer {

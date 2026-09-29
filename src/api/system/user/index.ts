@@ -20,8 +20,11 @@ export interface UserVO {
 }
 
 // 获取用户精简信息列表
-export const getSimpleUserList = (): Promise<UserVO[]> => {
-  return request.get({ url: '/system/user/simple-list' })
+export const getSimpleUserList = (includeDisabled = false): Promise<UserVO[]> => {
+  return request.get({
+    url: '/system/user/simple-list',
+    params: includeDisabled ? { includeDisabled: true } : undefined
+  })
 }
 
 // 按用户编号查询用户精简信息（点头像弹名片）

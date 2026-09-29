@@ -35,6 +35,7 @@
           <el-select v-model="queryParams.status" placeholder="全部状态" clearable class="!w-130px">
             <el-option label="可领用" :value="STATUS_BORROWING" />
             <el-option label="已归还" :value="STATUS_RETURNED" />
+            <el-option label="无需归还" :value="STATUS_NO_RETURN" />
           </el-select>
         </el-form-item>
         <el-form-item>
@@ -59,9 +60,13 @@
       <el-table v-loading="loading" :data="list">
         <el-table-column label="ID" prop="id" width="90" />
         <el-table-column label="BAS号" prop="basNo" min-width="160" show-overflow-tooltip />
+        <el-table-column label="领用类型" width="110">
+          <template #default="{ row }">{{ getMaterialTypeLabel(row.materialType) }}</template>
+        </el-table-column>
+        <el-table-column label="地点" width="90" prop="location" />
         <el-table-column label="需求人" prop="requester" min-width="130" show-overflow-tooltip />
         <el-table-column label="提单人" prop="submitter" min-width="130" show-overflow-tooltip />
-        <el-table-column label="样品信息" prop="sampleInfo" min-width="180" show-overflow-tooltip
+        <el-table-column label="物料信息" prop="sampleInfo" min-width="180" show-overflow-tooltip
           ><template #default="{ row }">{{ row.sampleInfo || '-' }}</template></el-table-column
         >
         <el-table-column label="备注" prop="remark" min-width="180" show-overflow-tooltip
@@ -69,9 +74,21 @@
         >
         <el-table-column label="状态" width="110"
           ><template #default="{ row }"
-            ><el-tag :type="row.status === STATUS_BORROWING ? 'primary' : 'info'">{{
-              row.status === STATUS_BORROWING ? '可领用' : '已归还'
-            }}</el-tag></template
+            ><el-tag
+              :type="
+                row.status === STATUS_BORROWING
+                  ? 'primary'
+                  : row.status === STATUS_NO_RETURN
+                    ? 'warning'
+                    : 'info'
+              "
+              >{{
+                row.status === STATUS_BORROWING
+                  ? '可领用'
+                  : row.status === STATUS_NO_RETURN
+                    ? '无需归还'
+                    : '已归还'
+              }}</el-tag></template
           ></el-table-column
         >
         <el-table-column label="登记时间" width="170"
@@ -82,8 +99,22 @@
             row.returnTime ? formatDate(row.returnTime) : '-'
           }}</template></el-table-column
         >
-        <el-table-column label="操作" fixed="right" width="110">
+        <el-table-column label="操作" fixed="right" width="250">
           <template #default="{ row }">
+            <el-button
+              v-hasPermi="['reagent:sample-loan:update']"
+              link
+              type="primary"
+              @click="openEditDialog(row)"
+              >修改</el-button
+            >
+            <el-button
+              v-hasPermi="['reagent:sample-loan:delete']"
+              link
+              type="danger"
+              @click="handleDelete(row)"
+              >删除</el-button
+            >
             <el-button
               v-if="row.status === STATUS_BORROWING"
               v-hasPermi="['reagent:sample-loan:return']"
@@ -92,7 +123,16 @@
               @click="handleReturn(row)"
               >归还</el-button
             >
-            <span v-else class="text-gray-400">已归还</span>
+            <el-button
+              v-if="row.status === STATUS_BORROWING"
+              v-hasPermi="['reagent:sample-loan:no-return', 'reagent:sample-loan:return']"
+              link
+              type="warning"
+              @click="handleNoReturn(row)"
+              >无需归还</el-button
+            >
+            <span v-if="row.status === STATUS_RETURNED" class="text-gray-400">已归还</span>
+            <span v-else-if="row.status === STATUS_NO_RETURN" class="text-gray-400">无需归还</span>
           </template>
         </el-table-column>
       </el-table>
@@ -104,7 +144,7 @@
       />
     </ContentWrap>
 
-    <el-dialog v-model="createDialogVisible" title="新增样品领用" width="520px" destroy-on-close>
+    <el-dialog v-model="createDialogVisible" :title="dialogTitle" width="560px" destroy-on-close>
       <el-form
         ref="createFormRef"
         :model="createForm"
@@ -115,6 +155,18 @@
         <el-form-item label="BAS号" prop="basNo"
           ><el-input v-model="createForm.basNo" placeholder="请输入 BAS 号" maxlength="64"
         /></el-form-item>
+        <el-form-item label="领用类型" prop="materialType">
+          <el-radio-group v-model="createForm.materialType">
+            <el-radio-button value="SAMPLE">样品</el-radio-button>
+            <el-radio-button value="REAGENT">试剂</el-radio-button>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item label="地点" prop="location">
+          <el-radio-group v-model="createForm.location">
+            <el-radio-button value="4楼">4楼</el-radio-button>
+            <el-radio-button value="8楼">8楼</el-radio-button>
+          </el-radio-group>
+        </el-form-item>
         <el-form-item label="需求人" prop="requesterId"
           ><el-select
             v-model="createForm.requesterId"
@@ -138,7 +190,7 @@
         <el-form-item label="提单人"
           ><el-input v-model="createForm.submitter" readonly
         /></el-form-item>
-        <el-form-item label="样品信息"
+        <el-form-item label="物料信息"
           ><el-input
             v-model="createForm.sampleInfo"
             type="textarea"
@@ -158,7 +210,7 @@
       <template #footer
         ><el-button @click="createDialogVisible = false">取消</el-button
         ><el-button type="primary" :loading="submitLoading" @click="submitCreateForm"
-          >确认登记</el-button
+          >{{ editingId ? '确认修改' : '确认登记' }}</el-button
         ></template
       >
     </el-dialog>
@@ -177,11 +229,19 @@ defineOptions({ name: 'ReagentSampleLoan' })
 const message = useMessage()
 const STATUS_BORROWING = 1
 const STATUS_RETURNED = 2
+const STATUS_NO_RETURN = 3
 const loading = ref(false)
 const total = ref(0)
 const list = ref<ReagentApi.SampleLoanVO[]>([])
 const userLoading = ref(false)
-const userOptions = ref<UserApi.UserVO[]>([])
+type RequesterOption = {
+  id: number
+  nickname: string
+  username?: string
+  status?: number
+}
+const userOptions = ref<RequesterOption[]>([])
+const allUserOptions = ref<RequesterOption[]>([])
 const queryParams = reactive({
   pageNo: 1,
   pageSize: 10,
@@ -214,8 +274,12 @@ const resetQuery = () => {
 const createDialogVisible = ref(false)
 const submitLoading = ref(false)
 const createFormRef = ref()
+const editingId = ref<number>()
+const dialogTitle = computed(() => (editingId.value ? '修改领用' : '新增领用'))
 const createForm = reactive({
   basNo: '',
+  materialType: undefined as 'SAMPLE' | 'REAGENT' | undefined,
+  location: undefined as '4楼' | '8楼' | undefined,
   requesterId: undefined as number | undefined,
   requester: '',
   submitterId: undefined as number | undefined,
@@ -225,29 +289,37 @@ const createForm = reactive({
 })
 const createRules = {
   basNo: [{ required: true, message: '请输入 BAS 号', trigger: 'blur' }],
+  materialType: [{ required: true, message: '请选择领用类型', trigger: 'change' }],
+  location: [{ required: true, message: '请选择地点', trigger: 'change' }],
   requesterId: [{ required: true, message: '请选择需求人', trigger: 'change' }]
 }
+const getMaterialTypeLabel = (materialType?: ReagentApi.SampleLoanVO['materialType']) =>
+  materialType === 'REAGENT' ? '试剂' : materialType === 'SAMPLE' ? '样品' : '-'
 const getUserDisplayName = (user?: { nickname?: string; username?: string }) =>
   user?.nickname || user?.username || ''
-const getUserOptionLabel = (user: UserApi.UserVO) => {
+const getUserOptionLabel = (user: RequesterOption) => {
   const displayName = getUserDisplayName(user)
-  return user.username && user.username !== displayName
+  const name = user.username && user.username !== displayName
     ? `${displayName}（${user.username}）`
     : displayName
+  return user.status === 1 ? `${name}（已禁用）` : name
 }
 const searchUsers = async (keyword: string) => {
   const value = keyword.trim()
   userLoading.value = true
   try {
-    const baseParams = { pageNo: 1, pageSize: 20, status: 0 }
-    const [byUsername, byNickname] = await Promise.all([
-      UserApi.getUserPage({ ...baseParams, username: value || undefined }),
-      UserApi.getUserPage({ ...baseParams, nickname: value || undefined })
-    ])
-    const userMap = new Map<number, UserApi.UserVO>()
-    const users = [...byUsername.list, ...byNickname.list]
-    users.forEach((user) => userMap.set(user.id, user))
-    userOptions.value = Array.from(userMap.values())
+    if (!allUserOptions.value.length) {
+      allUserOptions.value = await UserApi.getSimpleUserList(true)
+    }
+    const searchValue = value.toLowerCase()
+    userOptions.value = allUserOptions.value
+      .filter((user) => {
+        if (!searchValue) return true
+        return [user.nickname, user.username].some((text) =>
+          text?.toLowerCase().includes(searchValue)
+        )
+      })
+      .slice(0, 100)
   } finally {
     userLoading.value = false
   }
@@ -259,8 +331,11 @@ const handleRequesterChange = (requesterId?: number) => {
 }
 const openCreateDialog = () => {
   const currentUser = useUserStoreWithOut().getUser
+  editingId.value = undefined
   Object.assign(createForm, {
     basNo: '',
+    materialType: undefined,
+    location: undefined,
     requesterId: undefined,
     requester: '',
     submitterId: currentUser?.id,
@@ -270,25 +345,80 @@ const openCreateDialog = () => {
   })
   createDialogVisible.value = true
 }
+const openEditDialog = (row: ReagentApi.SampleLoanVO) => {
+  editingId.value = row.id
+  if (row.requesterId && !userOptions.value.some((user) => user.id === row.requesterId)) {
+    userOptions.value.push({ id: row.requesterId, nickname: row.requester })
+  }
+  Object.assign(createForm, {
+    basNo: row.basNo,
+    materialType: row.materialType,
+    location: row.location,
+    requesterId: row.requesterId,
+    requester: row.requester,
+    submitterId: row.submitterId,
+    submitter: row.submitter || '',
+    sampleInfo: row.sampleInfo || '',
+    remark: row.remark || ''
+  })
+  createDialogVisible.value = true
+}
 const submitCreateForm = async () => {
   await createFormRef.value.validate()
   submitLoading.value = true
   try {
-    await ReagentApi.createSampleLoan({
+    const payload = {
       basNo: createForm.basNo.trim(),
+      materialType: createForm.materialType!,
+      location: createForm.location!,
       requesterId: createForm.requesterId,
       requester: createForm.requester,
       submitterId: createForm.submitterId,
       submitter: createForm.submitter,
       sampleInfo: createForm.sampleInfo.trim() || undefined,
       remark: createForm.remark.trim() || undefined
-    })
-    message.success('领用登记成功')
+    }
+    // 重复检查仅用于提醒；检查接口异常时也不能影响正常登记。
+    let duplicate = false
+    try {
+      duplicate = await ReagentApi.checkSampleLoanDuplicate({
+        basNo: payload.basNo,
+        location: payload.location,
+        requesterId: payload.requesterId!,
+        excludeId: editingId.value
+      })
+    } catch {
+      duplicate = false
+    }
+    if (duplicate) {
+      try {
+        await message.confirm('相同 BAS 号、地点和需求人已有未结束记录，是否仍要继续登记？')
+      } catch {
+        return
+      }
+    }
+    if (editingId.value) {
+      await ReagentApi.updateSampleLoan({ id: editingId.value, ...payload })
+      message.success('领用记录已修改')
+    } else {
+      await ReagentApi.createSampleLoan(payload)
+      message.success('领用登记成功')
+    }
     createDialogVisible.value = false
     getList()
   } finally {
     submitLoading.value = false
   }
+}
+const handleDelete = async (row: ReagentApi.SampleLoanVO) => {
+  try {
+    await message.confirm(`确认删除 BAS 号“${row.basNo}”的领用记录？`)
+  } catch {
+    return
+  }
+  await ReagentApi.deleteSampleLoan(row.id)
+  message.success('领用记录已删除')
+  getList()
 }
 const handleReturn = async (row: ReagentApi.SampleLoanVO) => {
   try {
@@ -298,6 +428,16 @@ const handleReturn = async (row: ReagentApi.SampleLoanVO) => {
   }
   await ReagentApi.returnSampleLoan(row.id)
   message.success('已登记归还')
+  getList()
+}
+const handleNoReturn = async (row: ReagentApi.SampleLoanVO) => {
+  try {
+    await message.confirm(`确认 BAS 号“${row.basNo}”无需归还？确认后将不再显示在大屏。`)
+  } catch {
+    return
+  }
+  await ReagentApi.noReturnSampleLoan(row.id)
+  message.success('已登记为无需归还')
   getList()
 }
 const openScreen = () =>

@@ -26,17 +26,21 @@ export interface ReagentBaseFlatVO {
   syncTime?: string
 }
 
-/** 样品领用台账（独立于试剂库存和 LIMS） */
+/** 领用台账（独立于试剂库存和 LIMS） */
 export interface SampleLoanVO {
   id: number
   basNo: string
+  /** SAMPLE-样品；REAGENT-试剂 */
+  materialType: 'SAMPLE' | 'REAGENT'
+  /** 领用地点 */
+  location: '4楼' | '8楼'
   requesterId?: number
   requester: string
   submitterId?: number
   submitter?: string
   sampleInfo?: string
   remark?: string
-  /** 1-领用中；2-已归还 */
+  /** 1-可领用；2-已归还；3-无需归还 */
   status: number
   createTime?: string
   returnTime?: string
@@ -144,23 +148,52 @@ export const syncReagentChain = (param?: string) => {
   return request.post({ url: '/mes/erp-reagent/sync', params: { param } })
 }
 
-// ==================== 样品领用台账 API ====================
+// ==================== 领用台账 API ====================
 
 export const getSampleLoanPage = (params: any): Promise<PageResult<SampleLoanVO[]>> => {
   return request.get({ url: '/reagent/sample-loan/page', params })
 }
 
-export const createSampleLoan = (
-  data: Pick<
-    SampleLoanVO,
-    'basNo' | 'requesterId' | 'requester' | 'submitterId' | 'submitter' | 'sampleInfo' | 'remark'
-  >
-) => {
+export type SampleLoanSaveVO = Pick<
+  SampleLoanVO,
+  | 'basNo'
+  | 'materialType'
+  | 'location'
+  | 'requesterId'
+  | 'requester'
+  | 'submitterId'
+  | 'submitter'
+  | 'sampleInfo'
+  | 'remark'
+>
+
+export const createSampleLoan = (data: SampleLoanSaveVO) => {
   return request.post({ url: '/reagent/sample-loan/create', data })
+}
+
+export const updateSampleLoan = (data: SampleLoanSaveVO & Pick<SampleLoanVO, 'id'>) => {
+  return request.put({ url: '/reagent/sample-loan/update', data })
+}
+
+export const deleteSampleLoan = (id: number) => {
+  return request.delete({ url: '/reagent/sample-loan/delete', params: { id } })
+}
+
+export const checkSampleLoanDuplicate = (params: {
+  basNo: string
+  location: '4楼' | '8楼'
+  requesterId: number
+  excludeId?: number
+}): Promise<boolean> => {
+  return request.get({ url: '/reagent/sample-loan/check-duplicate', params })
 }
 
 export const returnSampleLoan = (id: number) => {
   return request.put({ url: '/reagent/sample-loan/return', params: { id } })
+}
+
+export const noReturnSampleLoan = (id: number) => {
+  return request.put({ url: '/reagent/sample-loan/no-return', params: { id } })
 }
 
 /** 大屏仅显示仍在领用中的记录 */
