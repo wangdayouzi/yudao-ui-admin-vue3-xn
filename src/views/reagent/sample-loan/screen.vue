@@ -11,12 +11,9 @@
       </div>
     </header>
     <section class="screen-panel">
-      <div class="grid-head">
-        <div v-for="column in 3" :key="column"><span>BAS 号</span><span>需求人</span></div>
-      </div>
       <div :key="pageNo" class="loan-grid">
         <article v-for="row in pageList" :key="row.id" class="loan-card">
-          <strong class="bas-value">{{ row.basNo }}</strong>
+          <strong :ref="setBasValueRef" class="bas-value">{{ row.basNo }}</strong>
           <strong class="requester-value">{{ row.requester }}</strong>
         </article>
         <div v-if="!loading && pageList.length === 0" class="empty-state">
@@ -68,7 +65,7 @@ import * as ReagentApi from '@/api/reagent'
 
 defineOptions({ name: 'ReagentSampleLoanScreen' })
 
-const PAGE_SIZE = 24
+const PAGE_SIZE = 18
 const loading = ref(false)
 const dataUnavailable = ref(false)
 const isDark = ref(false)
@@ -77,7 +74,16 @@ const nowText = ref('')
 const pageNo = ref(0)
 const locations = ['4楼', '8楼'] as const
 type Location = (typeof locations)[number]
-const activeLocation = ref<Location>('4楼')
+const route = useRoute()
+const router = useRouter()
+const queryToLocation = (value: unknown): Location | undefined => {
+  const queryValue = Array.isArray(value) ? value[0] : value
+  if (queryValue === '8F' || queryValue === '8楼') return '8楼'
+  if (queryValue === '4F' || queryValue === '4楼') return '4楼'
+  return undefined
+}
+const locationToQuery = (location: Location) => (location === '8楼' ? '8F' : '4F')
+const activeLocation = ref<Location>(queryToLocation(route.query.location) ?? '4楼')
 const materialTypeRank = { SAMPLE: 0, REAGENT: 1 } as const
 const sortedList = computed(() =>
   [...list.value]
@@ -94,12 +100,54 @@ const pageCount = computed(() => Math.max(Math.ceil(sortedList.value.length / PA
 const pageList = computed(() =>
   sortedList.value.slice(pageNo.value * PAGE_SIZE, (pageNo.value + 1) * PAGE_SIZE)
 )
+
+const basValueRefs = new Set<HTMLElement>()
+const setBasValueRef = (element: Element | null) => {
+  if (element instanceof HTMLElement) basValueRefs.add(element)
+}
+const fitBasValues = () => {
+  basValueRefs.forEach((element) => {
+    const availableWidth = element.clientWidth
+    if (!availableWidth) return
+
+    // 用同样式的隐藏副本测量完整文本，避免 text-overflow: ellipsis 干扰 scrollWidth。
+    const probe = element.cloneNode(true) as HTMLElement
+    Object.assign(probe.style, {
+      position: 'absolute',
+      left: '-100000px',
+      top: '0',
+      display: 'inline-block',
+      width: 'max-content',
+      maxWidth: 'none',
+      height: 'auto',
+      overflow: 'visible',
+      textOverflow: 'clip',
+      visibility: 'hidden',
+      pointerEvents: 'none'
+    })
+    document.body.appendChild(probe)
+
+    let fontSize = 72
+    probe.style.fontSize = `${fontSize}px`
+    while (probe.getBoundingClientRect().width > availableWidth && fontSize > 26) {
+      fontSize -= 1
+      probe.style.fontSize = `${fontSize}px`
+    }
+    element.style.fontSize = `${fontSize}px`
+    probe.remove()
+  })
+}
+
 let refreshTimer: ReturnType<typeof setInterval> | undefined
-let clockTimer: ReturnType<typeof setInterval> | undefined
+let clockTimer: ReturnType<typeof setTimeout> | undefined
 let pageTimer: ReturnType<typeof setInterval> | undefined
 
 const refreshClock = () => {
   nowText.value = dayjs().format('YYYY-MM-DD HH:mm:ss')
+}
+const scheduleClock = () => {
+  refreshClock()
+  clockTimer = setTimeout(scheduleClock, 1000 - (Date.now() % 1000))
 }
 const getList = async () => {
   loading.value = true
@@ -119,23 +167,46 @@ const selectLocation = (location: Location) => {
   if (activeLocation.value === location) return
   activeLocation.value = location
   pageNo.value = 0
+  void router.replace({
+    query: { ...route.query, location: locationToQuery(location) }
+  })
 }
 const nextPage = () => {
   if (pageCount.value > 1) pageNo.value = (pageNo.value + 1) % pageCount.value
 }
 
+watch(
+  () => route.query.location,
+  (value) => {
+    const location = queryToLocation(value)
+    if (location && location !== activeLocation.value) {
+      activeLocation.value = location
+      pageNo.value = 0
+    }
+  }
+)
+
 onMounted(() => {
-  refreshClock()
+  if (!queryToLocation(route.query.location)) {
+    void router.replace({
+      query: { ...route.query, location: locationToQuery(activeLocation.value) }
+    })
+  }
+  scheduleClock()
   getList()
+  window.addEventListener('resize', fitBasValues)
+  requestAnimationFrame(fitBasValues)
   refreshTimer = setInterval(getList, 10_000)
-  clockTimer = setInterval(refreshClock, 1_000)
   pageTimer = setInterval(nextPage, 10_000)
 })
 onBeforeUnmount(() => {
   if (refreshTimer) clearInterval(refreshTimer)
-  if (clockTimer) clearInterval(clockTimer)
+  if (clockTimer) clearTimeout(clockTimer)
   if (pageTimer) clearInterval(pageTimer)
+  window.removeEventListener('resize', fitBasValues)
 })
+onBeforeUpdate(() => basValueRefs.clear())
+onUpdated(fitBasValues)
 </script>
 
 <style lang="scss" scoped>
@@ -159,11 +230,12 @@ onBeforeUnmount(() => {
   --success: #087f72;
 
   position: relative;
-  display: flex;
-  height: 100vh;
-  min-width: 100vw;
+  display: grid;
+  width: 100%;
+  height: 100dvh;
+  min-width: 100%;
   min-height: 100vh;
-  padding: clamp(16px, 2vh, 30px) clamp(20px, 3vw, 56px) clamp(12px, 1.5vh, 24px);
+  padding: clamp(14px, 1.8vh, 26px) clamp(12px, 1.6vw, 28px) clamp(10px, 1.2vh, 20px);
   overflow: hidden;
   color: var(--text-primary);
   background:
@@ -174,7 +246,8 @@ onBeforeUnmount(() => {
     radial-gradient(ellipse 52% 48% at 100% 0%, var(--glow-a), transparent 72%),
     radial-gradient(ellipse 38% 34% at 0% 100%, var(--glow-b), transparent 70%), var(--background);
   box-sizing: border-box;
-  flex-direction: column;
+  grid-template-rows: auto minmax(0, 1fr);
+  isolation: isolate;
 
   &::before {
     position: absolute;
@@ -248,32 +321,19 @@ onBeforeUnmount(() => {
 }
 
 .screen-header {
-  display: flex;
-  min-height: clamp(126px, 20.5vh, 300px);
-  align-items: stretch;
-  justify-content: space-between;
-  padding: 0 0 10px;
+  display: grid;
+  min-width: 0;
+  min-height: clamp(150px, 25vh, 340px);
+  padding: 0 0 clamp(8px, 1vh, 14px);
   box-sizing: border-box;
-}
-
-.screen-path {
-  display: flex;
-  font-size: 14px;
-  letter-spacing: 0.5px;
-  color: var(--text-secondary);
-  align-items: center;
-  gap: 10px;
-
-  i {
-    width: 22px;
-    height: 1px;
-    background: var(--accent);
-  }
+  grid-template-columns: minmax(220px, 0.24fr) minmax(0, 1fr);
+  gap: clamp(12px, 1.4vw, 24px);
+  align-items: stretch;
 }
 
 .title-block h1 {
-  margin: clamp(6px, 1vh, 10px) 0 6px;
-  font-size: clamp(36px, 3.3vw, 84px);
+  margin: 0;
+  font-size: clamp(34px, 3.2vw, 76px);
   font-weight: 700;
   letter-spacing: 2px;
   color: var(--text-primary);
@@ -285,21 +345,16 @@ onBeforeUnmount(() => {
 }
 
 .title-block {
-  align-self: center;
-}
-
-.title-block p {
-  margin: 0;
-  font-size: clamp(13px, 1vw, 16px);
-  color: var(--text-secondary);
+  display: flex;
+  min-width: 0;
+  align-items: center;
 }
 
 .header-actions {
   display: flex;
   min-width: 0;
-  align-self: stretch;
   align-items: stretch;
-  gap: 14px;
+  justify-content: flex-end;
 }
 
 .time-card,
@@ -316,8 +371,8 @@ onBeforeUnmount(() => {
 
 .time-card {
   display: flex;
-  width: fit-content;
-  max-width: calc(100vw - 340px);
+  width: 100%;
+  max-width: none;
   min-width: 0;
   min-height: 0;
   padding: 0 18px;
@@ -335,7 +390,7 @@ onBeforeUnmount(() => {
   strong {
     margin-top: 5px;
     font-family: 'DIN Alternate', Bahnschrift, sans-serif;
-    font-size: clamp(48px, min(7.5vw, calc(9.5vw - 39px)), 250px);
+    font-size: clamp(48px, min(8.2vw, calc(9.7vw - 30px)), 260px);
     font-weight: 800;
     line-height: 1;
     letter-spacing: 1px;
@@ -373,16 +428,18 @@ onBeforeUnmount(() => {
 }
 
 .screen-panel {
-  display: flex;
+  display: grid;
+  min-width: 0;
   min-height: 0;
-  padding: 0 clamp(58px, 4vw, 76px) 8px 26px;
+  padding: clamp(8px, 1vh, 14px) clamp(42px, 2.8vw, 58px) clamp(8px, 1vh, 14px)
+    clamp(12px, 1vw, 20px);
   background: var(--panel);
   border: 1px solid var(--panel-border);
   border-radius: 10px;
   box-shadow: 0 24px 56px var(--card-shadow);
   box-sizing: border-box;
-  flex: 1;
-  flex-direction: column;
+  grid-template-columns: minmax(0, 1fr) 26px;
+  grid-template-rows: minmax(0, 1fr);
   backdrop-filter: blur(18px);
 }
 
@@ -396,37 +453,18 @@ onBeforeUnmount(() => {
   content: '';
 }
 
-.grid-head {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: clamp(4px, 0.55vw, 8px);
-  height: clamp(22px, 2.5vh, 30px);
-  padding: 0 clamp(10px, 1vw, 18px);
-
-  > div {
-    display: grid;
-    padding: 0 clamp(10px, 0.9vw, 16px);
-    font-size: clamp(13px, 0.9vw, 16px);
-    font-weight: 600;
-    letter-spacing: 0.5px;
-    color: var(--text-secondary);
-    border-bottom: 1px solid var(--panel-border);
-    grid-template-columns: minmax(0, 1.65fr) minmax(90px, 1fr);
-    gap: 12px;
-    align-items: center;
-    justify-items: center;
-  }
-}
-
 .loan-grid {
   display: grid;
+  width: 100%;
+  min-width: 0;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  grid-template-rows: repeat(8, minmax(0, 1fr));
+  grid-template-rows: repeat(6, minmax(0, 1fr));
   align-content: start;
   gap: clamp(3px, 0.35vw, 6px);
   min-height: 0;
+  grid-column: 1;
+  grid-row: 1;
   animation: page-enter 420ms ease both;
-  flex: 1;
 }
 
 @keyframes page-enter {
@@ -444,9 +482,11 @@ onBeforeUnmount(() => {
 .loan-card {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1.65fr) minmax(90px, 1fr);
+  min-width: 0;
+  min-height: 0;
+  grid-template-columns: minmax(0, 2fr) minmax(160px, 0.9fr);
   align-items: center;
-  gap: clamp(7px, 0.7vw, 12px);
+  gap: clamp(3px, 0.35vw, 5px);
   padding: clamp(4px, 0.6vh, 7px) clamp(10px, 0.9vw, 14px) clamp(4px, 0.6vh, 7px)
     clamp(12px, 1.1vw, 18px);
   overflow: hidden;
@@ -475,7 +515,7 @@ onBeforeUnmount(() => {
 .requester-value {
   width: 100%;
   overflow: hidden;
-  font-size: clamp(24px, 5vw, 60px);
+  font-size: clamp(24px, 3.8vw, 55px);
   line-height: 1;
   color: var(--text-primary);
   text-align: center;
@@ -485,10 +525,11 @@ onBeforeUnmount(() => {
 
 .bas-value {
   font-family: 'DIN Alternate', Bahnschrift, sans-serif;
-  font-size: clamp(26px, 5vw, 60px);
+  font-size: clamp(26px, 4.5vw, 72px);
   font-weight: 700;
   letter-spacing: 0.5px;
   color: var(--bas-color);
+  text-align: left;
 }
 
 .empty-state {
@@ -505,7 +546,7 @@ onBeforeUnmount(() => {
 
 .screen-controls {
   position: fixed;
-  right: clamp(14px, 1.4vw, 26px);
+  right: clamp(4px, 0.5vw, 10px);
   bottom: clamp(14px, 2vh, 30px);
   z-index: 5;
   display: flex;
@@ -516,6 +557,7 @@ onBeforeUnmount(() => {
 
 .location-toggle {
   display: flex;
+  flex-direction: column;
   padding: 3px;
   background: var(--panel);
   border: 1px solid var(--panel-border);
@@ -524,8 +566,8 @@ onBeforeUnmount(() => {
   gap: 3px;
 
   button {
-    min-width: 42px;
     height: 28px;
+    min-width: 42px;
     padding: 0 8px;
     font-size: 13px;
     color: var(--text-secondary);
@@ -543,11 +585,9 @@ onBeforeUnmount(() => {
 }
 
 .panel-footer {
-  position: absolute;
-  top: 50%;
-  right: clamp(12px, 1.1vw, 20px);
   display: flex;
-  height: auto;
+  width: 26px;
+  min-height: 0;
   padding: 0;
   margin: 0;
   font-size: clamp(12px, 0.8vw, 14px);
@@ -555,7 +595,9 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: center;
   gap: 10px;
-  transform: translateY(-50%);
+  grid-column: 2;
+  grid-row: 1;
+  place-self: center center;
   flex-direction: column;
 
   span:first-child {
