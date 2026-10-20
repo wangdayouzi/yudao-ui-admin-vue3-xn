@@ -235,7 +235,7 @@ async function handleExit() {
 /** 关闭项目详情 */
 function close() {
   delView(unref(currentRoute))
-  push({ name: 'PmsProject' })
+  push({ name: route.query.from === 'archive' ? 'PmsProjectArchive' : 'PmsProject' })
 }
 
 /** 初始化 */

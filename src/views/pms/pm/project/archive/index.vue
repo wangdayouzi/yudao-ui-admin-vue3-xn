@@ -6,7 +6,13 @@
 
   <ContentWrap>
     <el-table v-loading="loading" :data="projectList" :show-overflow-tooltip="true">
-      <el-table-column label="项目名称" min-width="320" prop="name" />
+      <el-table-column label="项目名称" min-width="320" prop="name">
+        <template #default="scope">
+          <el-button link type="primary" @click="openProjectDetail(scope.row)">
+            {{ scope.row.name }}
+          </el-button>
+        </template>
+      </el-table-column>
       <el-table-column :formatter="dateFormatter" label="归档时间" prop="archiveTime" width="220" />
       <el-table-column fixed="right" label="操作" width="120">
         <template #default="scope">
@@ -43,6 +49,7 @@ import {
 
 defineOptions({ name: 'PmsProjectArchive' })
 
+const { push } = useRouter()
 const message = useMessage() // 消息弹窗
 const loading = ref(true) // 列表加载中
 const total = ref(0) // 列表总数
@@ -55,6 +62,15 @@ const queryParams = reactive({
   status: PmsProjectStatus.ARCHIVED,
   sortType: PmsProjectSortType.ACCESS_TIME
 }) // 查询参数
+
+/** 查看归档项目详情 */
+function openProjectDetail(project: ProjectApi.PmsProjectVO) {
+  push({
+    name: 'PmsProjectDetail',
+    params: { id: project.id },
+    query: { tabs: 'overview', from: 'archive' }
+  })
+}
 
 /** 查询归档项目分页 */
 async function getProjectList() {
