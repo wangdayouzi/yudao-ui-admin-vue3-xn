@@ -75,13 +75,19 @@
       </el-form-item>
     </el-form>
     <template #footer>
-      <el-button :disabled="formLoading" type="primary" @click="submitForm">确 定</el-button>
-      <el-button @click="dialogVisible = false">取 消</el-button>
+      <el-button :loading="formLoading" type="primary" @click="submitForm">确 定</el-button>
+      <el-button :disabled="formLoading" @click="dialogVisible = false">取 消</el-button>
     </template>
   </Dialog>
 
   <!-- 模板文档编辑 -->
-  <Dialog v-model="documentDialogVisible" title="编辑模板文档" width="900px">
+  <Dialog
+    v-model="documentDialogVisible"
+    title="编辑模板文档"
+    width="900px"
+    :close-on-click-modal="false"
+    :before-close="beforeDocumentClose"
+  >
     <el-form
       ref="documentFormRef"
       :model="documentFormData"
@@ -97,12 +103,33 @@
         />
       </el-form-item>
       <el-form-item label="文档内容" prop="content">
-        <Editor v-model="documentFormData.content" height="420px" />
+        <el-alert
+          v-if="legacyConverted"
+          class="mb-8px"
+          type="warning"
+          :closable="false"
+          title="旧版富文本已转换为 Markdown，请检查排版后再保存。"
+        />
+        <KnowledgeMarkdownEditor
+          v-if="documentDialogVisible"
+          ref="documentEditorRef"
+          v-model="documentFormData.content"
+          @ready="editorReady = true"
+          @converted="legacyConverted = true"
+          @uploading="editorUploading = $event"
+        />
       </el-form-item>
     </el-form>
     <template #footer>
-      <el-button type="primary" @click="submitDocumentForm">确 定</el-button>
-      <el-button @click="documentDialogVisible = false">取 消</el-button>
+      <el-button
+        type="primary"
+        :disabled="!editorReady || editorUploading"
+        @click="submitDocumentForm"
+        >确 定</el-button
+      >
+      <el-button :disabled="editorUploading" @click="documentDialogVisible = false"
+        >取 消</el-button
+      >
     </template>
   </Dialog>
 </template>
@@ -112,6 +139,7 @@ import type { FormInstance, FormRules } from 'element-plus'
 import { DICT_TYPE, getIntDictOptions } from '@/utils/dict'
 import { CommonStatusEnum } from '@/utils/constants'
 import * as KnowledgeLibraryTemplateApi from '@/api/pms/kb/library/template'
+import KnowledgeMarkdownEditor from '../document/KnowledgeMarkdownEditor.vue'
 
 defineOptions({ name: 'PmsKnowledgeLibraryTemplateForm' })
 
@@ -124,23 +152,31 @@ const formData =
   ref<KnowledgeLibraryTemplateApi.PmsKnowledgeLibraryTemplateSaveReqVO>(getDefaultFormData())
 const formRef = ref<FormInstance>() // 表单 Ref
 const formRules = reactive<FormRules>({
-  name: [{ required: true, message: '请输入模板名称', trigger: 'blur' }],
+  name: [{ required: true, whitespace: true, message: '请输入模板名称', trigger: 'blur' }],
   status: [{ required: true, message: '请选择模板状态', trigger: 'change' }],
   sort: [{ required: true, message: '请输入显示顺序', trigger: 'blur' }],
   documents: [{ required: true, message: '请至少添加一篇模板文档', trigger: 'change' }]
 }) // 表单校验规则
 const documentDialogVisible = ref(false) // 文档编辑弹窗是否显示
+const documentEditorRef = ref<InstanceType<typeof KnowledgeMarkdownEditor>>()
+const editorReady = ref(false)
+const editorUploading = ref(false)
+const legacyConverted = ref(false)
 const documentFormRef = ref<FormInstance>() // 文档表单 Ref
 const documentFormData = ref<KnowledgeLibraryTemplateApi.PmsKnowledgeLibraryTemplateDocumentVO>({
   title: '',
   content: ''
 })
 const documentFormRules = reactive<FormRules>({
-  title: [{ required: true, message: '请输入文档标题', trigger: 'blur' }],
-  content: [{ required: true, message: '请输入文档内容', trigger: 'change' }]
+  title: [{ required: true, whitespace: true, message: '请输入文档标题', trigger: 'blur' }],
+  content: [{ required: true, whitespace: true, message: '请输入文档内容', trigger: 'change' }]
 }) // 文档表单校验规则
 const editingDocumentIndex = ref(-1) // 当前编辑文档下标
 const emit = defineEmits<{ success: [] }>() // 操作成功事件
+
+function beforeDocumentClose(done: () => void) {
+  if (!editorUploading.value) done()
+}
 
 /** 打开弹窗 */
 async function open(type: string, id?: number) {
@@ -164,15 +200,22 @@ defineExpose({ open }) // 提供 open 方法，用于打开弹窗
 /** 新增或编辑模板文档 */
 function openDocumentForm(index = -1) {
   editingDocumentIndex.value = index
+  editorReady.value = false
+  editorUploading.value = false
+  legacyConverted.value = false
   documentFormData.value =
-    index >= 0 ? { ...formData.value.documents[index] } : { title: '', content: '<p></p>' }
+    index >= 0 ? { ...formData.value.documents[index] } : { title: '', content: '' }
   documentFormRef.value?.clearValidate()
   documentDialogVisible.value = true
 }
 
 /** 保存模板文档 */
 async function submitDocumentForm() {
-  if (!documentFormRef.value || !(await documentFormRef.value.validate())) return
+  if (!editorReady.value || editorUploading.value || !documentFormRef.value) return
+  documentFormData.value.title = documentFormData.value.title.trim()
+  documentFormData.value.content =
+    documentEditorRef.value?.getValue() ?? documentFormData.value.content
+  if (!(await documentFormRef.value.validate().catch(() => false))) return
   const document = { ...documentFormData.value }
   if (editingDocumentIndex.value < 0) {
     formData.value.documents.push(document)
@@ -193,16 +236,16 @@ async function removeDocument(index: number) {
 
 /** 提交表单 */
 async function submitForm() {
-  // 校验表单
-  if (!formRef.value || !(await formRef.value.validate())) return
-  const documentTitles = formData.value.documents.map((document) => document.title)
-  if (new Set(documentTitles).size !== documentTitles.length) {
-    message.warning('模板文档标题不能重复')
-    return
-  }
-  // 提交请求
+  if (formLoading.value || !formRef.value) return
   formLoading.value = true
   try {
+    formData.value.name = formData.value.name.trim()
+    if (!(await formRef.value.validate().catch(() => false))) return
+    const documentTitles = formData.value.documents.map((document) => document.title)
+    if (new Set(documentTitles).size !== documentTitles.length) {
+      message.warning('模板文档标题不能重复')
+      return
+    }
     if (formType.value === 'create') {
       await KnowledgeLibraryTemplateApi.createKnowledgeLibraryTemplate(formData.value)
       message.success('新增成功')

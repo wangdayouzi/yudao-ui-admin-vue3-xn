@@ -1,27 +1,30 @@
 <template>
   <div
     class="min-h-360px flex items-center justify-center overflow-hidden border border-solid border-[var(--el-border-color-lighter)] rounded-[var(--el-border-radius-base)] bg-[var(--el-fill-color-lighter)]"
+    :class="expanded ? 'h-[calc(100vh-110px)]' : ''"
   >
     <el-image
       v-if="previewType === 'image'"
-      class="h-520px w-full"
+      class="w-full"
+      :style="{ height: expanded ? '100%' : 'max(520px, calc(100vh - 220px))' }"
       fit="contain"
       :preview-src-list="[url]"
       :src="url"
     />
     <div v-else-if="previewType === 'text'" v-loading="textLoading" class="min-h-360px w-full">
       <el-alert v-if="textError" :closable="false" show-icon :title="textError" type="error" />
-      <pre v-else class="m-0 max-h-620px overflow-auto whitespace-pre-wrap break-words p-16px">
+      <pre v-else class="m-0 overflow-auto whitespace-pre-wrap break-words p-16px" :class="expanded ? 'max-h-[calc(100vh-110px)]' : 'max-h-620px'">
         {{ textContent }}
       </pre>
     </div>
     <iframe
       v-else-if="previewType === 'iframe'"
-      class="h-620px w-full border-0 bg-[var(--el-bg-color)]"
+      class="w-full border-0 bg-[var(--el-bg-color)]"
+      :style="{ height: expanded ? '100%' : 'max(620px, calc(100vh - 190px))' }"
       :src="url"
       title="文件在线预览"
     ></iframe>
-    <video v-else-if="previewType === 'video'" class="h-520px w-full" controls :src="url">
+    <video v-else-if="previewType === 'video'" class="w-full" :style="{ height: expanded ? '100%' : 'max(520px, calc(100vh - 220px))' }" controls :src="url">
       当前浏览器不支持视频预览
     </video>
     <audio v-else-if="previewType === 'audio'" class="w-[min(560px,90%)]" controls :src="url">
@@ -39,7 +42,14 @@ const props = defineProps<{
   fileName?: string
   fileType?: string
   downloadable?: boolean
+  expanded?: boolean
 }>()
+
+const url = computed(() =>
+  props.url.startsWith('/admin-api/')
+    ? `${String(import.meta.env.VITE_BASE_URL || '').replace(/\/$/, '')}${props.url}`
+    : props.url
+)
 
 const IMAGE_EXTENSIONS = new Set(['bmp', 'gif', 'jpeg', 'jpg', 'png', 'svg', 'webp'])
 const IFRAME_EXTENSIONS = new Set(['pdf'])
@@ -78,7 +88,7 @@ const textError = ref('') // 文本加载失败提示
 
 /** 加载纯文本，未声明编码时使用 UTF-8，避免浏览器自动猜测导致中文乱码 */
 watch(
-  [() => props.url, previewType],
+  [url, previewType],
   async ([url, type], _oldValue, onCleanup) => {
     textContent.value = ''
     textError.value = ''

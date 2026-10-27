@@ -1,5 +1,5 @@
 <template>
-  <doc-alert title="【PMS】知识库管理" url="https://doc.iocoder.cn/pms/kb/library/" />
+  <div class="max-[767px]:hidden"><doc-alert title="【PMS】知识库管理" url="https://doc.iocoder.cn/pms/kb/library/" /></div>
 
   <ContentWrap>
     <!-- 搜索 -->
@@ -7,7 +7,7 @@
       <el-form-item label="知识库名称" prop="name">
         <el-input
           v-model="queryParams.name"
-          class="!w-240px"
+          class="!w-240px max-[767px]:!w-full"
           clearable
           placeholder="请输入知识库名称"
           @keyup.enter="handleQuery"
@@ -49,7 +49,7 @@
     </el-tabs>
 
     <!-- 列表 -->
-    <el-table v-loading="loading" :data="list" :show-overflow-tooltip="true">
+    <el-table v-loading="loading" :data="list" :show-overflow-tooltip="true" class="max-[767px]:!hidden">
       <el-table-column label="知识库" min-width="260">
         <template #default="scope">
           <div class="flex items-center gap-12px">
@@ -148,6 +148,20 @@
         </template>
       </el-table-column>
     </el-table>
+    <div v-loading="loading" class="min-[768px]:hidden">
+      <div v-for="library in list" :key="library.id" class="mb-10px rounded border border-solid border-[var(--el-border-color-lighter)] p-12px">
+        <div class="flex items-start justify-between gap-8px">
+          <el-link type="primary" class="min-w-0 !text-15px" @click="openDetail(library.id)">{{ library.name }}</el-link>
+          <el-tag size="small" :type="library.openStatus ? 'success' : 'info'">{{ library.openStatus ? '公开' : '私有' }}</el-tag>
+        </div>
+        <div class="mt-6px line-clamp-2 text-12px text-[var(--el-text-color-secondary)]">{{ library.description || '暂无简介' }}</div>
+        <div class="mt-10px flex items-center justify-between text-12px text-[var(--el-text-color-secondary)]">
+          <span>文档 {{ library.documentCount || 0 }} · 文件 {{ library.fileCount || 0 }}</span>
+          <el-button link type="primary" @click="openDetail(library.id)">进入知识库</el-button>
+        </div>
+      </div>
+      <el-empty v-if="!loading && !list.length" description="暂无知识库" />
+    </div>
     <Pagination
       v-model:limit="queryParams.pageSize"
       v-model:page="queryParams.pageNo"

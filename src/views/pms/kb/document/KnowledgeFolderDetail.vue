@@ -13,6 +13,23 @@
       </div>
     </div>
     <div class="flex shrink-0 flex-wrap items-center gap-8px">
+      <template
+        v-if="
+          canEditKnowledgeContent(folder.currentUserLevel) && checkPermi(['pms:kb:library:update'])
+        "
+      >
+        <el-button
+          class="!ml-0"
+          size="small"
+          type="primary"
+          @click="emit('create', 'create-document')"
+          ><Icon icon="ep:document-add" class="mr-4px" />新建文档</el-button
+        >
+        <el-button class="!ml-0" size="small" @click="emit('create', 'upload')">上传文件</el-button>
+        <el-button class="!ml-0" size="small" @click="emit('create', 'create-folder')"
+          >新建子文件夹</el-button
+        >
+      </template>
       <el-button
         v-if="canManage"
         v-hasPermi="['pms:kb:library:update']"
@@ -33,19 +50,20 @@
         <el-button class="!ml-0" size="small"><Icon icon="ep:more-filled" /></el-button>
         <template #dropdown>
           <el-dropdown-menu>
-            <el-dropdown-item v-hasPermi="['pms:kb:library:update']" command="update">
-              重命名
+            <el-dropdown-item v-if="checkPermi(['pms:kb:library:update'])" command="update">
+              文件夹设置
             </el-dropdown-item>
             <el-dropdown-item
-              v-if="canManage"
-              v-hasPermi="['pms:kb:library:update']"
+              v-if="canManage && checkPermi(['pms:kb:library:update'])"
               command="move"
             >
               移动
             </el-dropdown-item>
             <el-dropdown-item
-              v-if="canDeleteKnowledgeContent(folder.currentUserLevel)"
-              v-hasPermi="['pms:kb:library:delete']"
+              v-if="
+                canDeleteKnowledgeContent(folder.currentUserLevel) &&
+                checkPermi(['pms:kb:library:delete'])
+              "
               command="delete"
               divided
             >
@@ -90,6 +108,7 @@ import * as KnowledgeFolderApi from '@/api/pms/kb/content/folder'
 import { PmsKnowledgeContentLevel } from '@/views/pms/kb/utils/constants'
 import { canDeleteKnowledgeContent, canEditKnowledgeContent } from '@/views/pms/kb/utils/permission'
 import { formatDate } from '@/utils/formatTime'
+import { checkPermi } from '@/utils/permission'
 import {
   getKnowledgeTreeNodeIcon,
   getKnowledgeTreeNodeTypeName,
@@ -102,7 +121,15 @@ const props = defineProps<{
   folder: KnowledgeFolderApi.PmsKnowledgeFolderVO
   children: KnowledgeTreeNode[]
 }>() // 组件参数
-const emit = defineEmits(['collect', 'permission', 'update', 'move', 'delete', 'node-click']) // 组件事件
+const emit = defineEmits([
+  'collect',
+  'permission',
+  'update',
+  'move',
+  'delete',
+  'node-click',
+  'create'
+]) // 组件事件
 const message = useMessage() // 消息弹窗
 
 const canManage = computed(() => props.folder.currentUserLevel === PmsKnowledgeContentLevel.MANAGE) // 是否可管理文件夹协作权限

@@ -10,12 +10,16 @@ export interface PmsKnowledgeDocumentVO {
   folderId: number // 文件夹编号
   parentId: number // 父文档编号
   title: string // 文档标题
+  documentCode?: string // 固定业务编号
+  attributes?: Record<string, string> // 当前属性值
+  carriedAttributes?: Array<{ fieldName: string; fieldCode: string; sourceLibraryId: number; value: string }>
   contentSummary?: string // 正文摘要
   content: string // 文档内容或文件地址
   previewUrl?: string // 文件预览地址
   type: number // 文档类型
   fileType?: string // 文件类型
   fileSize?: number // 文件大小，单位：字节
+  versionNo?: number // 当前内容版本号
   status: number // 文档状态
   labelIds?: number[] // 标签编号列表
   creatorUserId?: number // 创建人用户编号
@@ -41,11 +45,14 @@ export interface PmsKnowledgeDocumentCreateReqVO {
   content?: string // 文档内容或文件地址
   fileType?: string // 文件类型
   fileSize?: number // 文件大小，单位：字节
+  status?: number // 0 草稿、1 已发布
+  attributes?: Record<string, string>
 }
 
 // PMS 知识库文档修改 VO
 export interface PmsKnowledgeDocumentUpdateReqVO {
   id: number // 文档编号
+  expectedVersionNo?: number // 编辑时读取的版本号
   title?: string // 文档标题
   content?: string // 文档内容或文件地址
   labelIds?: number[] // 标签编号列表，传空数组表示清空标签
@@ -83,13 +90,76 @@ export const getKnowledgeDocument = (id: number, view = false) => {
 
 // 新增知识库文档
 export const createKnowledgeDocument = (data: PmsKnowledgeDocumentCreateReqVO) => {
-  return request.post({ url: '/pms/kb/document/create', data })
+  return request.post<number>({ url: '/pms/kb/document/create', data })
 }
+
+export interface PmsKnowledgeDocumentDraftVO {
+  documentId: number
+  baseVersionNo: number
+  title: string
+  content?: string
+  labelIds?: number[]
+  updateTime?: number
+}
+
+export const getKnowledgeDocumentDraft = (documentId: number) =>
+  request.get<PmsKnowledgeDocumentDraftVO | undefined>({
+    url: '/pms/kb/document/draft-get', params: { documentId }
+  })
+
+export const saveKnowledgeDocumentDraft = (data: PmsKnowledgeDocumentDraftVO) =>
+  request.put({ url: '/pms/kb/document/draft-save', data })
+
+export const publishKnowledgeDocumentDraft = (documentId: number) =>
+  request.put({ url: '/pms/kb/document/draft-publish', params: { documentId } })
 
 // 修改知识库文档
 export const updateKnowledgeDocument = (data: PmsKnowledgeDocumentUpdateReqVO) => {
   return request.put({ url: '/pms/kb/document/update', data })
 }
+
+export interface PmsKnowledgeDocumentVersionVO {
+  versionNo: number
+  title: string
+  content?: string
+  type: number
+  fileType?: string
+  fileSize?: number
+  editorUserId?: number
+  createTime: number
+}
+
+export const getKnowledgeDocumentVersionList = (documentId: number) =>
+  request.get<PmsKnowledgeDocumentVersionVO[]>({
+    url: '/pms/kb/document/version-list', params: { documentId }
+  })
+
+export const getKnowledgeDocumentVersion = (documentId: number, versionNo: number) =>
+  request.get<PmsKnowledgeDocumentVersionVO>({
+    url: '/pms/kb/document/version-get', params: { documentId, versionNo }
+  })
+
+export const getKnowledgeOfficePreviewConfig = (documentId: number) =>
+  request.get<Record<string, any>>({
+    url: '/pms/kb/document/office-preview-config', params: { documentId }
+  })
+
+export const getKnowledgeOfficeHistoryPreviewConfig = (documentId: number, versionNo: number) =>
+  request.get<Record<string, any>>({
+    url: '/pms/kb/document/office-history-preview-config', params: { documentId, versionNo }
+  })
+
+export const getKnowledgeHistoryPreviewUrl = (documentId: number, versionNo: number) =>
+  request.get<string>({
+    url: '/pms/kb/document/history-preview-url', params: { documentId, versionNo }
+  })
+
+export const restoreKnowledgeDocumentVersion = (
+  documentId: number, versionNo: number, expectedVersionNo: number
+) => request.put({
+  url: '/pms/kb/document/version-restore',
+  params: { documentId, versionNo, expectedVersionNo }
+})
 
 // 删除知识库文档
 export const deleteKnowledgeDocument = (id: number) => {

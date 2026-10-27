@@ -9,6 +9,7 @@ export interface PmsKnowledgeFolderVO {
   currentUserLevel: number // 当前用户协作等级
   parentId: number // 父文件夹编号
   title: string // 文件夹标题
+  numberRuleId?: number // 一级文件夹编号规则覆盖值
   childFolderCount: number // 直属子文件夹数量
   documentCount: number // 直属文档数量
   status: number // 状态

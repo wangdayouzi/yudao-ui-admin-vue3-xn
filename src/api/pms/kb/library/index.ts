@@ -7,6 +7,7 @@ export interface PmsKnowledgeLibraryVO {
   description?: string // 知识库简介
   openStatus: boolean // 是否公开
   coverUrl?: string // 知识库封面
+  numberRuleId?: number // 默认文档编号规则
   adminUserIds?: number[] // 创建时的初始管理员用户编号列表
   memberUserIds?: number[] // 创建时的初始普通成员用户编号列表
   templateId?: number // 模板编号，仅创建时有效

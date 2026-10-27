@@ -23,6 +23,27 @@
       <el-form-item label="分享给成员">
         <UserSelectV2 v-model="shareUserIds" :multiple="true" placeholder="请选择内部分享成员" />
       </el-form-item>
+      <el-form-item label="有效期">
+        <el-date-picker
+          v-model="expireTime"
+          type="datetime"
+          value-format="YYYY-MM-DDTHH:mm:ss"
+          placeholder="不选择则长期有效"
+          clearable
+          class="w-full"
+        />
+      </el-form-item>
+      <el-form-item label="访问码">
+        <el-input
+          v-model="accessCode"
+          maxlength="64"
+          show-password
+          :placeholder="share?.accessCodeRequired ? '留空则保留原访问码' : '留空则无需访问码'"
+        />
+      </el-form-item>
+      <el-form-item v-if="share?.accessCodeRequired" label="清除访问码">
+        <el-switch v-model="removeAccessCode" />
+      </el-form-item>
     </el-form>
     <template #footer>
       <el-popconfirm
@@ -38,7 +59,7 @@
         </template>
       </el-popconfirm>
       <el-button :disabled="formLoading" type="primary" @click="submitShare">
-        {{ share ? '保存成员' : '开启分享' }}
+        {{ share ? '保存设置' : '开启分享' }}
       </el-button>
       <el-button @click="dialogVisible = false">取 消</el-button>
     </template>
@@ -59,6 +80,9 @@ const formLoading = ref(false) // 表单提交中
 const documentId = ref<number>() // 文档编号
 const share = ref<KnowledgeDocumentShareApi.PmsKnowledgeDocumentShareVO>() // 文档分享信息
 const shareUserIds = ref<number[]>([]) // 分享成员用户编号
+const expireTime = ref<string>()
+const accessCode = ref('')
+const removeAccessCode = ref(false)
 const qrCodeDataUrl = ref('') // 分享二维码图片数据
 const qrCodeOptions = {
   margin: 1,
@@ -79,6 +103,9 @@ async function open(id: number) {
   try {
     share.value = await KnowledgeDocumentShareApi.getKnowledgeDocumentShare(id)
     shareUserIds.value = share.value?.shareUserIds || []
+    expireTime.value = share.value?.expireTime
+    accessCode.value = ''
+    removeAccessCode.value = false
   } finally {
     formLoading.value = false
   }
@@ -90,17 +117,24 @@ async function submitShare() {
   formLoading.value = true
   try {
     if (share.value) {
-      await KnowledgeDocumentShareApi.updateKnowledgeDocumentShareMemberList({
+      share.value = await KnowledgeDocumentShareApi.updateKnowledgeDocumentShare({
         documentId: documentId.value,
-        shareUserIds: shareUserIds.value
+        shareUserIds: shareUserIds.value,
+        expireTime: expireTime.value,
+        accessCode: accessCode.value || undefined,
+        removeAccessCode: removeAccessCode.value
       })
-      message.success('分享成员已更新')
-      dialogVisible.value = false
+      accessCode.value = ''
+      removeAccessCode.value = false
+      message.success('分享设置已更新，原链接已失效')
     } else {
       share.value = await KnowledgeDocumentShareApi.openKnowledgeDocumentShare({
         documentId: documentId.value,
-        shareUserIds: shareUserIds.value
+        shareUserIds: shareUserIds.value,
+        expireTime: expireTime.value,
+        accessCode: accessCode.value || undefined
       })
+      accessCode.value = ''
       message.success('分享已开启')
     }
   } finally {

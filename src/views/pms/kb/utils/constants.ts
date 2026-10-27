@@ -24,6 +24,19 @@ export const PmsKnowledgeUploadFileTypes = [
 /** PMS 知识库单文件上传上限，单位：MB */
 export const PmsKnowledgeUploadFileSize = 100
 
+/** 同时兼容扩展名和已有文件记录中的 MIME 类型 */
+export function isPmsKnowledgeOfficeFile(fileType?: string): boolean {
+  return [
+    'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.ms-powerpoint',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+  ].includes(fileType?.trim().toLowerCase() || '')
+}
+
 /** PMS 知识对象类型 */
 export const PmsKnowledgeObjectType = {
   LIBRARY: 1,

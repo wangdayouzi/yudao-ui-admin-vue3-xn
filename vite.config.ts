@@ -1,4 +1,5 @@
 import {dirname, relative, resolve} from 'path'
+import {cpSync, existsSync} from 'node:fs'
 import type {ConfigEnv, UserConfig} from 'vite'
 import {loadEnv, normalizePath} from 'vite'
 import {createVitePlugins} from './build/vite'
@@ -19,6 +20,11 @@ function getRelativeScssUsePath(filename: string, targetPath: string) {
 
 // https://vitejs.dev/config/
 export default ({command, mode}: ConfigEnv): UserConfig => {
+    // Vditor loads language packs, themes and renderers at runtime.
+    // Serve the installed version locally so intranet deployments need no public CDN.
+    const vditorDist = pathResolve('node_modules/vditor/dist')
+    if (!existsSync(vditorDist)) throw new Error('Vditor 未安装，请先安装项目依赖')
+    cpSync(vditorDist, pathResolve('public/vditor/dist'), {recursive: true, force: true})
     let env = {} as any
     const isBuild = command === 'build'
     if (!isBuild) {

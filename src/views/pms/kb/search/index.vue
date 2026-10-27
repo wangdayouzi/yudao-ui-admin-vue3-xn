@@ -9,7 +9,7 @@
           v-model="queryParams.keyword"
           class="!w-240px"
           clearable
-          placeholder="请输入文档标题或正文"
+          placeholder="搜索标题、正文或附件内容"
           @keyup.enter="handleQuery"
         />
       </el-form-item>
@@ -48,11 +48,17 @@
 
   <!-- 列表 -->
   <ContentWrap>
+    <div class="mb-12px flex flex-wrap justify-end gap-8px">
+      <el-button v-hasPermi="['pms:kb:library:update']" type="primary" @click="openCreate">
+        <Icon icon="ep:plus" />新增知识
+      </el-button>
+      <el-button @click="router.push('/pms/kb/review-workbench')">有效性审阅</el-button>
+    </div>
     <el-table v-loading="loading" :data="list" :show-overflow-tooltip="true">
       <el-table-column label="文档标题" min-width="280">
         <template #default="scope">
           <el-link type="primary" @click="openDocumentDetail(scope.row)">
-            {{ scope.row.title }}
+            <span v-dompurify-html="highlightSummary(scope.row.title)" />
           </el-link>
           <span
             v-if="scope.row.fileSize !== undefined && scope.row.fileSize !== null"
@@ -89,10 +95,63 @@
       @pagination="getList"
     />
   </ContentWrap>
+  <Dialog v-model="createVisible" title="新增知识" width="520px">
+    <el-form label-width="90px">
+      <el-form-item label="知识库" required>
+        <el-select
+          v-model="createLibraryId"
+          class="w-full"
+          filterable
+          placeholder="选择知识库"
+          @change="loadCreateTree"
+        >
+          <el-option
+            v-for="library in writableLibraries"
+            :key="library.id"
+            :label="library.name"
+            :value="library.id"
+          />
+        </el-select>
+      </el-form-item>
+      <el-form-item label="目录">
+        <el-tree-select
+          v-model="createFolderId"
+          :data="createFolderOptions"
+          class="w-full"
+          check-strictly
+          node-key="value"
+          placeholder="请选择目录"
+          @change="loadRootRule"
+        />
+      </el-form-item>
+      <el-form-item label="内容类型" required>
+        <el-radio-group v-model="createType"
+          ><el-radio value="document">新建文档</el-radio
+          ><el-radio value="upload">上传文件</el-radio></el-radio-group
+        >
+      </el-form-item>
+      <el-alert v-if="createRuleHint" :title="createRuleHint" type="warning" :closable="false" />
+    </el-form>
+    <template #footer
+      ><el-button @click="createVisible = false">取消</el-button
+      ><el-button type="primary" :disabled="!canStartCreate" @click="startCreate"
+        >继续</el-button
+      ></template
+    >
+  </Dialog>
+  <KnowledgeDocumentCreateForm ref="createFormRef" @success="handleCreated" />
+  <KnowledgeFileUploadForm ref="uploadFormRef" @success="handleCreated" />
 </template>
 
 <script lang="ts" setup>
 import * as KnowledgeDocumentApi from '@/api/pms/kb/content/document'
+import * as KnowledgeLibraryApi from '@/api/pms/kb/library'
+import * as KnowledgeFolderApi from '@/api/pms/kb/content/folder'
+import KnowledgeDocumentCreateForm from '../document/KnowledgeDocumentCreateForm.vue'
+import KnowledgeFileUploadForm from '../document/KnowledgeFileUploadForm.vue'
+import { PmsKnowledgeRootId } from '@/views/pms/kb/utils/constants'
+import { canEditKnowledgeContent } from '@/views/pms/kb/utils/permission'
+import { getAllPageItems } from '@/utils/page'
 import { DICT_TYPE } from '@/utils/dict'
 import { dateFormatter, defaultShortcuts } from '@/utils/formatTime'
 import KnowledgeLibrarySelect from '@/views/pms/kb/library/components/KnowledgeLibrarySelect.vue'
@@ -115,6 +174,114 @@ const queryParams = reactive({
   updateTime: route.query.updateTime ? String(route.query.updateTime).split(',') : ([] as string[])
 }) // 查询参数
 const queryFormRef = ref() // 查询表单 Ref
+const createVisible = ref(false)
+const createLibraryId = ref<number>()
+const createFolderId = ref(PmsKnowledgeRootId)
+const createType = ref<'document' | 'upload'>('document')
+const writableLibraries = ref<KnowledgeLibraryApi.PmsKnowledgeLibraryVO[]>([])
+const createTree = ref<KnowledgeFolderApi.PmsKnowledgeTreeVO>()
+interface CreateFolderOption {
+  value: number
+  label: string
+  disabled?: boolean
+  children?: CreateFolderOption[]
+}
+const createFolderOptions = ref<CreateFolderOption[]>([])
+const selectedRootRuleId = ref<number>()
+const createFormRef = ref<InstanceType<typeof KnowledgeDocumentCreateForm>>()
+const uploadFormRef = ref<InstanceType<typeof KnowledgeFileUploadForm>>()
+const createLocationWritable = computed(() => {
+  if (createFolderId.value === PmsKnowledgeRootId) return Boolean(createTree.value?.writeStatus)
+  const findFolder = (
+    nodes: KnowledgeFolderApi.PmsKnowledgeFolderTreeNode[]
+  ): KnowledgeFolderApi.PmsKnowledgeFolderTreeNode | undefined => {
+    for (const node of nodes) {
+      if (node.id === createFolderId.value) return node
+      const found = findFolder(node.children || [])
+      if (found) return found
+    }
+  }
+  return canEditKnowledgeContent(findFolder(createTree.value?.folders || [])?.currentUserLevel)
+})
+const createRuleHint = computed(() => {
+  const library = writableLibraries.value.find((item) => item.id === createLibraryId.value)
+  if (!library) return ''
+  if (!createLocationWritable.value) return '当前位置没有新增权限，请选择可写目录'
+  if (createFolderId.value === PmsKnowledgeRootId)
+    return library.numberRuleId ? '' : '此知识库尚未配置文档编号规则'
+  return selectedRootRuleId.value || library.numberRuleId
+    ? ''
+    : '此目录及知识库尚未配置文档编号规则'
+})
+const canStartCreate = computed(() => Boolean(createLibraryId.value && !createRuleHint.value))
+
+async function openCreate() {
+  writableLibraries.value = await getAllPageItems<KnowledgeLibraryApi.PmsKnowledgeLibraryVO>(
+    (pageNo, pageSize) => KnowledgeLibraryApi.getKnowledgeLibraryPage({ pageNo, pageSize })
+  )
+  createVisible.value = true
+  createLibraryId.value = writableLibraries.value.find(
+    (library) => library.id === queryParams.libraryId
+  )?.id
+  createFolderId.value = PmsKnowledgeRootId
+  createType.value = 'document'
+  if (createLibraryId.value) await loadCreateTree()
+}
+async function loadCreateTree() {
+  createFolderId.value = PmsKnowledgeRootId
+  selectedRootRuleId.value = undefined
+  createTree.value = createLibraryId.value
+    ? await KnowledgeFolderApi.getKnowledgeTree(createLibraryId.value)
+    : undefined
+  const folderOption = (
+    folder: KnowledgeFolderApi.PmsKnowledgeFolderTreeNode
+  ): CreateFolderOption => ({
+    value: folder.id,
+    label: folder.title,
+    disabled: !canEditKnowledgeContent(folder.currentUserLevel),
+    children: (folder.children || []).map(folderOption)
+  })
+  createFolderOptions.value = [
+    {
+      value: PmsKnowledgeRootId,
+      label: '知识库根目录',
+      disabled: !createTree.value?.writeStatus,
+      children: (createTree.value?.folders || []).map(folderOption)
+    }
+  ]
+}
+async function loadRootRule() {
+  selectedRootRuleId.value = undefined
+  if (!createFolderId.value) return
+  const findRoot = (
+    nodes: KnowledgeFolderApi.PmsKnowledgeFolderTreeNode[],
+    rootId?: number
+  ): number | undefined => {
+    for (const node of nodes) {
+      if (node.id === createFolderId.value) return rootId || node.id
+      const found = findRoot(node.children || [], rootId || node.id)
+      if (found) return found
+    }
+  }
+  const rootId = findRoot(createTree.value?.folders || [])
+  if (rootId)
+    selectedRootRuleId.value = (await KnowledgeFolderApi.getKnowledgeFolder(rootId)).numberRuleId
+}
+function startCreate() {
+  if (!createLibraryId.value || createRuleHint.value) return
+  createVisible.value = false
+  if (createType.value === 'upload')
+    uploadFormRef.value?.open(createLibraryId.value, createFolderId.value)
+  else createFormRef.value?.open(createLibraryId.value, createFolderId.value)
+}
+function handleCreated(documentId?: number) {
+  if (documentId && createLibraryId.value)
+    router.push({
+      path: `/pms/kb/library/${createLibraryId.value}/document/${documentId}`,
+      query: { edit: '1' }
+    })
+  else getList()
+}
 
 /** 查询文档列表 */
 async function getList() {
@@ -147,10 +314,20 @@ function openDocumentDetail(document: KnowledgeDocumentApi.PmsKnowledgeDocumentV
 
 /** 在摘要中高亮当前关键词，内容经过 DOMPurify 指令处理。 */
 function highlightSummary(summary: string) {
+  const escapeHtml = (text: string) =>
+    text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;')
   const keyword = queryParams.keyword.trim()
-  if (!keyword) return summary
+  if (!keyword) return escapeHtml(summary || '')
   const escapedKeyword = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  return summary.replace(new RegExp(`(${escapedKeyword})`, 'gi'), '<mark>$1</mark>')
+  return (summary || '')
+    .split(new RegExp(`(${escapedKeyword})`, 'gi'))
+    .map((part, index) => (index % 2 ? `<mark>${escapeHtml(part)}</mark>` : escapeHtml(part)))
+    .join('')
 }
 
 /** 初始化 */

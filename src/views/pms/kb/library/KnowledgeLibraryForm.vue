@@ -109,6 +109,7 @@
     <!-- 知识库基础信息 -->
     <el-form
       v-else
+      @submit.prevent
       ref="formRef"
       v-loading="formLoading"
       :model="formData"
@@ -117,6 +118,8 @@
     >
       <el-form-item label="知识库名称" prop="name">
         <el-input
+          ref="nameInputRef"
+          @keydown.enter="confirmKnowledgeName($event, submitForm)"
           v-model="formData.name"
           maxlength="50"
           placeholder="请输入知识库名称"
@@ -135,6 +138,30 @@
           show-word-limit
           type="textarea"
         />
+      </el-form-item>
+      <el-form-item label="默认编号规则">
+        <el-select
+          v-model="formData.numberRuleId"
+          clearable
+          placeholder="未配置时根目录不能创建文档"
+          class="w-full"
+        >
+          <el-option
+            v-for="rule in numberRules"
+            :key="rule.id"
+            :value="rule.id!"
+            :label="`${rule.name}（${rule.prefix} + ${rule.digits} 位流水）`"
+          />
+        </el-select>
+        <div class="text-12px text-[var(--el-text-color-secondary)]"
+          >新建文档保存时自动按此规则生成编号；一级目录可单独覆盖。</div
+        >
+        <div
+          v-if="formType === 'create' && formData.templateId"
+          class="text-12px text-[var(--el-color-warning)]"
+        >
+          使用模板时需要选择默认编号规则，模板文档创建后自动编号。
+        </div>
       </el-form-item>
       <el-form-item label="可见范围" prop="openStatus">
         <el-radio-group
@@ -210,7 +237,9 @@
 </template>
 
 <script lang="ts" setup>
+import { confirmKnowledgeName } from '@/views/pms/kb/utils/interaction'
 import * as KnowledgeLibraryApi from '@/api/pms/kb/library'
+import { getEnabledNumberRules, type NumberRuleVO } from '@/api/infra/number-rule'
 import { getCurrentUserId } from '@/utils/auth'
 import UserSelectV2 from '@/views/system/user/components/UserSelectV2.vue'
 import type { FormRules } from 'element-plus'
@@ -227,6 +256,7 @@ const formType = ref('') // 表单类型：create - 新增；update - 修改
 const templateSelecting = ref(false) // 是否正在选择知识库模板
 const templateLoading = ref(false) // 模板加载中
 const templateList = ref<KnowledgeLibraryApi.PmsKnowledgeLibraryTemplateVO[]>([]) // 知识库模板列表
+const numberRules = ref<NumberRuleVO[]>([])
 const selectedTemplateId = ref(0) // 0 表示空白知识库
 const formData = ref<KnowledgeLibraryApi.PmsKnowledgeLibraryVO>(getDefaultFormData()) // 表单数据
 const currentUserId = getCurrentUserId() // 创建人用户编号，不能重复加入初始成员
@@ -237,6 +267,7 @@ const formRules = reactive<FormRules>({
   openStatus: [{ required: true, message: '请选择可见范围', trigger: 'change' }]
 }) // 表单校验规则
 const formRef = ref() // 表单 Ref
+const nameInputRef = ref<{ focus: () => void }>()
 const memberFormRef = ref() // 知识库成员表单 Ref
 const emit = defineEmits(['success']) // 定义 success 事件，用于操作成功后的回调
 const selectedTemplate = computed(() =>
@@ -245,6 +276,7 @@ const selectedTemplate = computed(() =>
 
 /** 打开弹窗 */
 async function open(type: string, id?: number) {
+  numberRules.value = await getEnabledNumberRules()
   dialogVisible.value = true
   formType.value = type
   templateSelecting.value = type === 'create'
@@ -265,6 +297,7 @@ async function open(type: string, id?: number) {
       }
     } finally {
       formLoading.value = false
+      nextTick(() => nameInputRef.value?.focus())
     }
   }
 }
@@ -294,7 +327,10 @@ function handleTemplateNext() {
   resetInitialMembers()
   templateSelecting.value = false
   dialogTitle.value = '新建知识库'
-  nextTick(() => formRef.value?.clearValidate())
+  nextTick(() => {
+    formRef.value?.clearValidate()
+    nameInputRef.value?.focus()
+  })
 }
 
 /** 返回知识库模板选择 */
@@ -328,17 +364,22 @@ function handleMemberSuccess() {
 
 /** 提交表单 */
 async function submitForm() {
+  if (formLoading.value || templateSelecting.value) return
   // 校验表单
   if (!formRef.value) return
-  const valid = await formRef.value.validate()
-  if (!valid) return
-  if (formType.value === 'create' && !validateInitialMembers()) {
-    message.warning('同一用户不能同时设置为初始管理员和普通成员')
-    return
-  }
-  // 提交请求
   formLoading.value = true
   try {
+    formData.value.name = formData.value.name.trim()
+    const valid = await formRef.value.validate().catch(() => false)
+    if (!valid) return
+    if (formType.value === 'create' && formData.value.templateId && !formData.value.numberRuleId) {
+      message.warning('使用模板创建知识库时，请选择默认编号规则')
+      return
+    }
+    if (formType.value === 'create' && !validateInitialMembers()) {
+      message.warning('同一用户不能同时设置为初始管理员和普通成员')
+      return
+    }
     if (formType.value === 'create') {
       await KnowledgeLibraryApi.createKnowledgeLibrary({
         ...formData.value,

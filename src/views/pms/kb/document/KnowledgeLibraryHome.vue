@@ -21,12 +21,17 @@
             {{ library?.favoriteStatus ? '取消关注' : '关注' }}
           </el-dropdown-item>
           <el-dropdown-item
-            v-if="writeStatus && library?.adminStatus"
-            v-hasPermi="['pms:kb:library:update']"
+            v-if="(writeStatus && library?.adminStatus) && checkPermi(['pms:kb:library:update'])"
             command="member"
           >
             成员管理
           </el-dropdown-item>
+          <el-dropdown-item v-if="manageStatus" command="archive">
+            内容导入与导出
+          </el-dropdown-item>
+          <el-dropdown-item v-if="(library?.adminStatus) && checkPermi(['pms:kb:library:update'])" command="attributes">自定义属性</el-dropdown-item>
+          <el-dropdown-item v-if="(library?.adminStatus) && checkPermi(['pms:kb:library:update'])" command="number-rule">文档编号规则</el-dropdown-item>
+          <el-dropdown-item v-if="(library?.adminStatus) && checkPermi(['pms:kb:library:update'])" command="review">审阅规则</el-dropdown-item>
           <el-dropdown-item v-if="library?.exitStatus" command="exit" divided>
             退出知识库
           </el-dropdown-item>
@@ -67,6 +72,7 @@
 </template>
 
 <script lang="ts" setup>
+import { checkPermi } from '@/utils/permission'
 import type { PmsKnowledgeLibraryVO } from '@/api/pms/kb/library'
 import type { PmsKnowledgeInteractionItemVO } from '@/api/pms/kb/interaction/favorite'
 import { PmsKnowledgeObjectType } from '@/views/pms/kb/utils/constants'
@@ -84,11 +90,16 @@ const props = defineProps<{
   favoriteItems: PmsKnowledgeInteractionItemVO[]
   favoriteLoading: boolean
   writeStatus: boolean
+  manageStatus: boolean
 }>() // 组件参数
 const emit = defineEmits<{
   (event: 'collect'): void
   (event: 'exit'): void
   (event: 'member'): void
+  (event: 'archive'): void
+  (event: 'attributes'): void
+  (event: 'number-rule'): void
+  (event: 'review'): void
   (event: 'search'): void
   (event: 'node-click', node: KnowledgeTreeNode): void
   (event: 'tab-change', tab: 'all' | 'favorite'): void
@@ -114,11 +125,19 @@ const displayNodes = computed<KnowledgeTreeNode[]>(() => {
 }) // 当前页签展示内容
 
 /** 处理更多操作 */
-function handleMoreCommand(command: 'collect' | 'member' | 'exit') {
+function handleMoreCommand(command: 'collect' | 'member' | 'archive' | 'attributes' | 'number-rule' | 'review' | 'exit') {
   if (command === 'collect') {
     emit('collect')
   } else if (command === 'member') {
     emit('member')
+  } else if (command === 'archive') {
+    emit('archive')
+  } else if (command === 'attributes') {
+    emit('attributes')
+  } else if (command === 'number-rule') {
+    emit('number-rule')
+  } else if (command === 'review') {
+    emit('review')
   } else {
     emit('exit')
   }
