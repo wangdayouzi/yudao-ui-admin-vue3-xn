@@ -32,8 +32,10 @@ export interface SampleLoanVO {
   basNo: string
   /** SAMPLE-样品；REAGENT-试剂 */
   materialType: 'SAMPLE' | 'REAGENT'
+  /** 领用站点，字典配置 */
+  site?: string
   /** 领用地点 */
-  location: '4楼' | '8楼'
+  location: string
   requesterId?: number
   requester: string
   submitterId?: number
@@ -158,6 +160,7 @@ export type SampleLoanSaveVO = Pick<
   SampleLoanVO,
   | 'basNo'
   | 'materialType'
+  | 'site'
   | 'location'
   | 'requesterId'
   | 'requester'
@@ -181,7 +184,8 @@ export const deleteSampleLoan = (id: number) => {
 
 export const checkSampleLoanDuplicate = (params: {
   basNo: string
-  location: '4楼' | '8楼'
+  site?: string
+  location: string
   requesterId: number
   excludeId?: number
 }): Promise<boolean> => {
@@ -196,13 +200,27 @@ export const noReturnSampleLoan = (id: number) => {
   return request.put({ url: '/reagent/sample-loan/no-return', params: { id } })
 }
 
-/** 大屏仅显示仍在领用中的记录 */
-export const getBorrowingSampleLoanList = (): Promise<SampleLoanVO[]> => {
+/** 大屏按站点和楼层读取最近 24 小时仍可领用的记录 */
+export const getBorrowingSampleLoanList = (
+  location: string
+): Promise<SampleLoanVO[]> => {
   return request.get({
     url: '/reagent/sample-loan/screen-list',
+    params: { location },
     headers: { silentError: true }
   })
 }
+
+export interface SampleLoanOption {
+  label: string
+  value: string
+}
+
+export const getSampleLoanSites = (): Promise<SampleLoanOption[]> =>
+  request.get({ url: '/reagent/sample-loan/sites' })
+
+export const getSampleLoanLocations = (site: string): Promise<SampleLoanOption[]> =>
+  request.get({ url: '/reagent/sample-loan/locations', params: { site } })
 
 // ==================== 申请单 API ====================
 

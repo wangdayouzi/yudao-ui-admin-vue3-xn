@@ -39,12 +39,12 @@
       <div class="location-toggle" role="group" aria-label="楼层切换">
         <button
           v-for="location in locations"
-          :key="location"
+          :key="location.value"
           type="button"
-          :class="{ active: activeLocation === location }"
-          @click="selectLocation(location)"
+          :class="{ active: activeLocation === location.value }"
+          @click="selectLocation(location.value)"
         >
-          {{ location }}
+          {{ location.label }}
         </button>
       </div>
       <button
@@ -72,22 +72,20 @@ const isDark = ref(false)
 const list = ref<ReagentApi.SampleLoanVO[]>([])
 const nowText = ref('')
 const pageNo = ref(0)
-const locations = ['4楼', '8楼'] as const
-type Location = (typeof locations)[number]
+const locations = ref<ReagentApi.SampleLoanOption[]>([])
+type Location = string
 const route = useRoute()
 const router = useRouter()
 const queryToLocation = (value: unknown): Location | undefined => {
   const queryValue = Array.isArray(value) ? value[0] : value
-  if (queryValue === '8F' || queryValue === '8楼') return '8楼'
-  if (queryValue === '4F' || queryValue === '4楼') return '4楼'
-  return undefined
+  if (typeof queryValue !== 'string') return undefined
+  return /^\d+F$/i.test(queryValue) ? `${queryValue.slice(0, -1)}楼` : queryValue
 }
-const locationToQuery = (location: Location) => (location === '8楼' ? '8F' : '4F')
+const locationToQuery = (location: Location) => location
 const activeLocation = ref<Location>(queryToLocation(route.query.location) ?? '4楼')
 const materialTypeRank = { SAMPLE: 0, REAGENT: 1 } as const
 const sortedList = computed(() =>
   [...list.value]
-    .filter((row) => row.location === activeLocation.value)
     .sort((a, b) => {
       const typeDiff =
         (materialTypeRank[a.materialType] ?? 99) - (materialTypeRank[b.materialType] ?? 99)
@@ -141,6 +139,7 @@ const fitBasValues = () => {
 let refreshTimer: ReturnType<typeof setInterval> | undefined
 let clockTimer: ReturnType<typeof setTimeout> | undefined
 let pageTimer: ReturnType<typeof setInterval> | undefined
+let requestVersion = 0
 
 const refreshClock = () => {
   nowText.value = dayjs().format('YYYY-MM-DD HH:mm:ss')
@@ -150,25 +149,26 @@ const scheduleClock = () => {
   clockTimer = setTimeout(scheduleClock, 1000 - (Date.now() % 1000))
 }
 const getList = async () => {
+  const version = ++requestVersion
   loading.value = true
   try {
-    const data = await ReagentApi.getBorrowingSampleLoanList()
+    const data = await ReagentApi.getBorrowingSampleLoanList(activeLocation.value)
+    if (version !== requestVersion) return
     list.value = [...data]
     if (pageNo.value >= pageCount.value) pageNo.value = 0
     dataUnavailable.value = false
   } catch {
+    if (version !== requestVersion) return
     // 大屏只读接口异常时保留最后一次成功数据，不打断时钟和翻页。
     dataUnavailable.value = list.value.length === 0
   } finally {
-    loading.value = false
+    if (version === requestVersion) loading.value = false
   }
 }
 const selectLocation = (location: Location) => {
   if (activeLocation.value === location) return
-  activeLocation.value = location
-  pageNo.value = 0
   void router.replace({
-    query: { ...route.query, location: locationToQuery(location) }
+    query: { location: locationToQuery(location) }
   })
 }
 const nextPage = () => {
@@ -177,26 +177,38 @@ const nextPage = () => {
 
 watch(
   () => route.query.location,
-  (value) => {
-    const location = queryToLocation(value)
-    if (location && location !== activeLocation.value) {
+  (locationValue) => {
+    const location = queryToLocation(locationValue) ?? '4楼'
+    if (location !== activeLocation.value) {
       activeLocation.value = location
+      list.value = []
       pageNo.value = 0
+      getList()
     }
   }
 )
 
 onMounted(() => {
-  if (!queryToLocation(route.query.location)) {
-    void router.replace({
-      query: { ...route.query, location: locationToQuery(activeLocation.value) }
-    })
-  }
   scheduleClock()
-  getList()
+  void (async () => {
+    locations.value = await ReagentApi.getSampleLoanLocations('NINGBO')
+    const location = locations.value.some((item) => item.value === activeLocation.value)
+      ? activeLocation.value : locations.value[0]?.value
+    if (!location) {
+      dataUnavailable.value = true
+      return
+    }
+    activeLocation.value = location
+    if (route.query.site || route.query.location !== locationToQuery(location)) {
+      await router.replace({ query: { location: locationToQuery(location) } })
+    }
+    await getList()
+  })().catch(() => { dataUnavailable.value = list.value.length === 0 })
   window.addEventListener('resize', fitBasValues)
   requestAnimationFrame(fitBasValues)
-  refreshTimer = setInterval(getList, 10_000)
+  refreshTimer = setInterval(() => {
+    if (locations.value.length) void getList()
+  }, 10_000)
   pageTimer = setInterval(nextPage, 10_000)
 })
 onBeforeUnmount(() => {
@@ -348,6 +360,9 @@ onUpdated(fitBasValues)
   display: flex;
   min-width: 0;
   align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: clamp(8px, 1.2vh, 16px);
 }
 
 .header-actions {

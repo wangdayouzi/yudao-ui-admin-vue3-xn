@@ -8,6 +8,7 @@ export interface UserVO {
   deptId: number
   deptName?: string
   postIds: string[]
+  roleIds?: number[]
   email: string
   mobile: string
   sex: number

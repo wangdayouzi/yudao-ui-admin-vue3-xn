@@ -31,6 +31,16 @@
             />
           </el-select>
         </el-form-item>
+        <el-form-item label="站点">
+          <el-select v-model="queryParams.site" placeholder="全部站点" clearable class="!w-130px" @change="onQuerySiteChange">
+            <el-option v-for="site in siteOptions" :key="site.value" :label="site.label" :value="site.value" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="楼层">
+          <el-select v-model="queryParams.location" placeholder="全部楼层" clearable class="!w-130px">
+            <el-option v-for="location in queryLocationOptions" :key="location.value" :label="location.label" :value="location.value" />
+          </el-select>
+        </el-form-item>
         <el-form-item label="状态">
           <el-select v-model="queryParams.status" placeholder="全部状态" clearable class="!w-130px">
             <el-option label="可领用" :value="STATUS_BORROWING" />
@@ -55,7 +65,7 @@
           @click="openCreateDialog"
           ><Icon icon="ep:plus" />新增领用</el-button
         >
-        <el-button @click="openScreen"><Icon icon="ep:full-screen" />打开大屏</el-button>
+        <el-button @click="openScreen"><Icon icon="ep:full-screen" />打开宁波大屏</el-button>
       </div>
       <el-table v-loading="loading" :data="list">
         <el-table-column label="ID" prop="id" width="90" />
@@ -63,7 +73,10 @@
         <el-table-column label="领用类型" width="110">
           <template #default="{ row }">{{ getMaterialTypeLabel(row.materialType) }}</template>
         </el-table-column>
-        <el-table-column label="地点" width="90" prop="location" />
+        <el-table-column label="站点" width="90">
+          <template #default="{ row }">{{ getSiteLabel(row.site) }}</template>
+        </el-table-column>
+        <el-table-column label="楼层" width="90" prop="location" />
         <el-table-column label="需求人" prop="requester" min-width="130" show-overflow-tooltip />
         <el-table-column label="提单人" prop="submitter" min-width="130" show-overflow-tooltip />
         <el-table-column label="物料信息" prop="sampleInfo" min-width="180" show-overflow-tooltip
@@ -91,7 +104,7 @@
               }}</el-tag></template
           ></el-table-column
         >
-        <el-table-column label="登记时间" width="170"
+        <el-table-column label="领用时间" width="170"
           ><template #default="{ row }">{{ formatDate(row.createTime) }}</template></el-table-column
         >
         <el-table-column label="归还时间" width="170"
@@ -161,10 +174,14 @@
             <el-radio-button value="REAGENT">试剂</el-radio-button>
           </el-radio-group>
         </el-form-item>
-        <el-form-item label="地点" prop="location">
+        <el-form-item label="站点" prop="site">
+          <el-radio-group v-model="createForm.site" @change="onFormSiteChange">
+            <el-radio-button v-for="site in siteOptions" :key="site.value" :value="site.value">{{ site.label }}</el-radio-button>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item label="楼层" prop="location">
           <el-radio-group v-model="createForm.location">
-            <el-radio-button value="4楼">4楼</el-radio-button>
-            <el-radio-button value="8楼">8楼</el-radio-button>
+            <el-radio-button v-for="location in formLocationOptions" :key="location.value" :value="location.value">{{ location.label }}</el-radio-button>
           </el-radio-group>
         </el-form-item>
         <el-form-item label="需求人" prop="requesterId"
@@ -242,10 +259,31 @@ type RequesterOption = {
 }
 const userOptions = ref<RequesterOption[]>([])
 const allUserOptions = ref<RequesterOption[]>([])
+const siteOptions = ref<ReagentApi.SampleLoanOption[]>([])
+const locationsBySite = ref<Record<string, ReagentApi.SampleLoanOption[]>>({})
+const loadLocations = async (site: string) => {
+  if (!site || locationsBySite.value[site]) return
+  locationsBySite.value = { ...locationsBySite.value, [site]: await ReagentApi.getSampleLoanLocations(site) }
+}
+const queryLocationOptions = computed(() => {
+  if (queryParams.site) return locationsBySite.value[queryParams.site] || []
+  return [...new Map(Object.values(locationsBySite.value).flat().map((item) => [item.value, item])).values()]
+})
+const formLocationOptions = computed(() => createForm.site ? locationsBySite.value[createForm.site] || [] : [])
+const onQuerySiteChange = async (site?: string) => {
+  queryParams.location = undefined
+  if (site) await loadLocations(site)
+}
+const onFormSiteChange = async (site: string) => {
+  createForm.location = undefined
+  await loadLocations(site)
+}
 const queryParams = reactive({
   pageNo: 1,
   pageSize: 10,
   basNo: '',
+  site: undefined as string | undefined,
+  location: undefined as string | undefined,
   requesterId: undefined as number | undefined,
   status: undefined as number | undefined
 })
@@ -266,6 +304,8 @@ const handleQuery = () => {
 }
 const resetQuery = () => {
   queryParams.basNo = ''
+  queryParams.site = undefined
+  queryParams.location = undefined
   queryParams.requesterId = undefined
   queryParams.status = undefined
   handleQuery()
@@ -279,7 +319,8 @@ const dialogTitle = computed(() => (editingId.value ? '修改领用' : '新增�
 const createForm = reactive({
   basNo: '',
   materialType: undefined as 'SAMPLE' | 'REAGENT' | undefined,
-  location: undefined as '4楼' | '8楼' | undefined,
+  site: undefined as string | undefined,
+  location: undefined as string | undefined,
   requesterId: undefined as number | undefined,
   requester: '',
   submitterId: undefined as number | undefined,
@@ -290,11 +331,14 @@ const createForm = reactive({
 const createRules = {
   basNo: [{ required: true, message: '请输入 BAS 号', trigger: 'blur' }],
   materialType: [{ required: true, message: '请选择领用类型', trigger: 'change' }],
+  site: [{ required: true, message: '请选择站点', trigger: 'change' }],
   location: [{ required: true, message: '请选择地点', trigger: 'change' }],
   requesterId: [{ required: true, message: '请选择需求人', trigger: 'change' }]
 }
 const getMaterialTypeLabel = (materialType?: ReagentApi.SampleLoanVO['materialType']) =>
   materialType === 'REAGENT' ? '试剂' : materialType === 'SAMPLE' ? '样品' : '-'
+const getSiteLabel = (site?: ReagentApi.SampleLoanVO['site']) =>
+  siteOptions.value.find((item) => item.value === (site || 'NINGBO'))?.label || site || '宁波'
 const getUserDisplayName = (user?: { nickname?: string; username?: string }) =>
   user?.nickname || user?.username || ''
 const getUserOptionLabel = (user: RequesterOption) => {
@@ -335,6 +379,7 @@ const openCreateDialog = () => {
   Object.assign(createForm, {
     basNo: '',
     materialType: undefined,
+    site: undefined,
     location: undefined,
     requesterId: undefined,
     requester: '',
@@ -346,6 +391,7 @@ const openCreateDialog = () => {
   createDialogVisible.value = true
 }
 const openEditDialog = (row: ReagentApi.SampleLoanVO) => {
+  void loadLocations(row.site || 'NINGBO')
   editingId.value = row.id
   if (row.requesterId && !userOptions.value.some((user) => user.id === row.requesterId)) {
     userOptions.value.push({ id: row.requesterId, nickname: row.requester })
@@ -353,6 +399,7 @@ const openEditDialog = (row: ReagentApi.SampleLoanVO) => {
   Object.assign(createForm, {
     basNo: row.basNo,
     materialType: row.materialType,
+    site: row.site || 'NINGBO',
     location: row.location,
     requesterId: row.requesterId,
     requester: row.requester,
@@ -370,6 +417,7 @@ const submitCreateForm = async () => {
     const payload = {
       basNo: createForm.basNo.trim(),
       materialType: createForm.materialType!,
+      site: createForm.site!,
       location: createForm.location!,
       requesterId: createForm.requesterId,
       requester: createForm.requester,
@@ -383,6 +431,7 @@ const submitCreateForm = async () => {
     try {
       duplicate = await ReagentApi.checkSampleLoanDuplicate({
         basNo: payload.basNo,
+        site: payload.site,
         location: payload.location,
         requesterId: payload.requesterId!,
         excludeId: editingId.value
@@ -392,7 +441,7 @@ const submitCreateForm = async () => {
     }
     if (duplicate) {
       try {
-        await message.confirm('相同 BAS 号、地点和需求人已有未结束记录，是否仍要继续登记？')
+        await message.confirm('相同 BAS 号、站点、楼层和需求人已有未结束记录，是否仍要继续登记？')
       } catch {
         return
       }
@@ -441,7 +490,24 @@ const handleNoReturn = async (row: ReagentApi.SampleLoanVO) => {
   getList()
 }
 const openScreen = () =>
-  window.open(router.resolve({ path: '/reagent/sample-loan-screen' }).href, '_blank', 'noopener')
+  window.open(
+    router.resolve({
+      path: '/reagent/sample-loan-screen',
+      query: {
+        location:
+          queryParams.site === 'NINGBO' && queryParams.location
+            ? queryParams.location
+            : locationsBySite.value.NINGBO?.[0]?.value || '4楼'
+      }
+    }).href,
+    '_blank',
+    'noopener'
+  )
+const loadOptions = async () => {
+  siteOptions.value = await ReagentApi.getSampleLoanSites()
+  await Promise.all(siteOptions.value.map((site) => loadLocations(site.value)))
+}
+void loadOptions().catch(() => message.error('地点配置加载失败，请刷新页面'))
 getList()
 searchUsers('')
 </script>

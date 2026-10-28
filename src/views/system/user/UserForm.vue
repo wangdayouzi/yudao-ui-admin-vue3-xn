@@ -88,6 +88,20 @@
           </el-form-item>
         </el-col>
       </el-row>
+      <el-row v-if="canAssignRole">
+        <el-col :span="24">
+          <el-form-item label="角色" prop="roleIds">
+            <el-select v-model="formData.roleIds" multiple filterable placeholder="请选择角色">
+              <el-option
+                v-for="item in roleList"
+                :key="item.id"
+                :label="item.name"
+                :value="item.id"
+              />
+            </el-select>
+          </el-form-item>
+        </el-col>
+      </el-row>
       <el-row>
         <el-col :span="24">
           <el-form-item label="备注">
@@ -105,9 +119,12 @@
 <script lang="ts" setup>
 import { DICT_TYPE, getIntDictOptions } from '@/utils/dict'
 import { CommonStatusEnum } from '@/utils/constants'
+import { checkPermi } from '@/utils/permission'
 import { defaultProps, handleTree } from '@/utils/tree'
 import * as PostApi from '@/api/system/post'
 import * as DeptApi from '@/api/system/dept'
+import * as PermissionApi from '@/api/system/permission'
+import * as RoleApi from '@/api/system/role'
 import * as UserApi from '@/api/system/user'
 import { FormRules } from 'element-plus'
 
@@ -133,7 +150,7 @@ const formData = ref({
   postIds: [],
   remark: '',
   status: CommonStatusEnum.ENABLE,
-  roleIds: []
+  roleIds: [] as number[]
 })
 const formRules = reactive<FormRules>({
   username: [{ required: true, message: '用户名称不能为空', trigger: 'blur' }],
@@ -157,6 +174,8 @@ const formRules = reactive<FormRules>({
 const formRef = ref() // 表单 Ref
 const deptList = ref<Tree[]>([]) // 树形结构
 const postList = ref([] as PostApi.PostVO[]) // 岗位列表
+const roleList = ref([] as RoleApi.RoleVO[]) // 角色列表
+const canAssignRole = ref(false) // 是否有分配角色的权限（角色走独立接口，权限也独立）
 
 /** 打开弹窗 */
 const open = async (type: string, id?: number) => {
@@ -164,11 +183,24 @@ const open = async (type: string, id?: number) => {
   dialogTitle.value = t('action.' + type)
   formType.value = type
   resetForm()
+  // 有分配角色权限时，才展示和加载角色
+  canAssignRole.value = checkPermi(['system:permission:assign-user-role'])
+  if (canAssignRole.value) {
+    try {
+      roleList.value = await RoleApi.getSimpleRoleList()
+    } catch {
+      // 角色列表加载失败不影响用户信息的修改
+    }
+  }
   // 修改时，设置数据
   if (id) {
     formLoading.value = true
     try {
       formData.value = await UserApi.getUser(id)
+      // 用户的角色不在用户详情中返回，需要单独查询
+      if (canAssignRole.value) {
+        formData.value.roleIds = await PermissionApi.getUserRoleList(id)
+      }
     } finally {
       formLoading.value = false
     }
@@ -191,12 +223,20 @@ const submitForm = async () => {
   formLoading.value = true
   try {
     const data = formData.value as unknown as UserApi.UserVO
+    let userId: number | undefined = formData.value.id
     if (formType.value === 'create') {
-      await UserApi.createUser(data)
+      userId = await UserApi.createUser(data)
       message.success(t('common.createSuccess'))
     } else {
       await UserApi.updateUser(data)
       message.success(t('common.updateSuccess'))
+    }
+    // 有分配角色权限时，同步保存角色（角色走独立的权限接口）
+    if (canAssignRole.value && userId) {
+      await PermissionApi.assignUserRole({
+        userId,
+        roleIds: formData.value.roleIds
+      })
     }
     dialogVisible.value = false
     // 发送操作成功的事件
@@ -221,7 +261,7 @@ const resetForm = () => {
     postIds: [],
     remark: '',
     status: CommonStatusEnum.ENABLE,
-    roleIds: []
+    roleIds: [] as number[]
   }
   formRef.value?.resetFields()
 }

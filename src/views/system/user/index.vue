@@ -6,7 +6,7 @@
   <el-row :gutter="20">
     <!-- 左侧部门树 -->
     <el-col :span="4" :xs="24">
-      <ContentWrap class="h-1/1">5
+      <ContentWrap class="h-1/1">
         <DeptTreeSelect @node-click="handleDeptNodeClick" />
       </ContentWrap>
     </el-col>
@@ -108,6 +108,15 @@
               v-hasPermi="['system:user:export']"
             >
               <Icon icon="ep:download" />导出
+            </el-button>
+            <el-button
+              type="warning"
+              plain
+              :disabled="checkedIds.length === 0"
+              @click="handleAssignRoleBatch"
+              v-hasPermi="['system:permission:assign-user-role']"
+            >
+              <Icon icon="ep:user" />批量修改角色
             </el-button>
             <el-button
               type="danger"
@@ -232,6 +241,8 @@
   <UserImportForm ref="importFormRef" @success="getList" />
   <!-- 分配角色 -->
   <UserAssignRoleForm ref="assignRoleFormRef" @success="getList" />
+  <!-- 批量修改角色 -->
+  <UserAssignRoleBatchForm ref="assignRoleBatchFormRef" @success="handleAssignRoleBatchSuccess" />
 </template>
 <script lang="ts" setup>
 import { ElMessageBox } from 'element-plus'
@@ -244,6 +255,7 @@ import * as UserApi from '@/api/system/user'
 import UserForm from './UserForm.vue'
 import UserImportForm from './UserImportForm.vue'
 import UserAssignRoleForm from './UserAssignRoleForm.vue'
+import UserAssignRoleBatchForm from './UserAssignRoleBatchForm.vue'
 import DeptTreeSelect from '@/views/system/dept/components/DeptTreeSelect.vue'
 
 defineOptions({ name: 'SystemUser' })
@@ -374,7 +386,9 @@ const handleDelete = async (id: number) => {
 
 /** 批量删除按钮操作 */
 const checkedIds = ref<number[]>([])
+const checkedRows = ref<UserApi.UserVO[]>([])
 const handleRowCheckboxChange = (rows: UserApi.UserVO[]) => {
+  checkedRows.value = rows
   checkedIds.value = rows.map((row) => row.id)
 }
 
@@ -416,6 +430,19 @@ const handleResetPwd = async (row: UserApi.UserVO) => {
 const assignRoleFormRef = ref()
 const handleRole = (row: UserApi.UserVO) => {
   assignRoleFormRef.value.open(row)
+}
+
+/** 批量修改角色 */
+const assignRoleBatchFormRef = ref()
+const handleAssignRoleBatch = () => {
+  assignRoleBatchFormRef.value.open(checkedRows.value)
+}
+
+/** 批量修改角色成功后，清空选中并刷新列表 */
+const handleAssignRoleBatchSuccess = () => {
+  checkedIds.value = []
+  checkedRows.value = []
+  getList()
 }
 
 /** 初始化 */
