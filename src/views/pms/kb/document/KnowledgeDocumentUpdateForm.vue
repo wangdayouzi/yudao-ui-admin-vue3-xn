@@ -5,13 +5,13 @@
     default-fullscreen
     fullscreen
     :close-on-click-modal="false"
-    :title="formData.type === PmsKnowledgeDocumentType.FILE ? '替换文件' : '编辑文档'"
+    :title="formData.type === PmsKnowledgeDocumentType.FILE ? '上传新版本' : '编辑文档'"
   >
     <template #title>
       <div class="flex w-full min-w-0 flex-wrap items-center justify-between gap-12px pr-48px">
         <div class="flex min-w-0 items-center gap-12px">
           <span class="shrink-0 font-600">{{
-            formData.type === PmsKnowledgeDocumentType.FILE ? '替换文件' : '编辑文档'
+            formData.type === PmsKnowledgeDocumentType.FILE ? '上传新版本' : '编辑文档'
           }}</span>
           <span
             v-if="formData.type === PmsKnowledgeDocumentType.RICH_TEXT"
@@ -43,14 +43,24 @@
             :disabled="
               !!staleDraft ||
               imageUploading ||
+              fileUploading ||
               (formData.type === PmsKnowledgeDocumentType.RICH_TEXT && !previewing && !editorReady)
             "
             type="primary"
             @click="submitForm"
           >
-            {{ formData.type === PmsKnowledgeDocumentType.RICH_TEXT ? '发布' : '保存' }}
+            {{
+              formData.type === PmsKnowledgeDocumentType.RICH_TEXT
+                ? '发布'
+                : replacementFile
+                  ? '保存新版本'
+                  : '保存修改'
+            }}
           </el-button>
-          <el-button class="!ml-0" :disabled="formLoading || imageUploading" @click="closeEditor"
+          <el-button
+            class="!ml-0"
+            :disabled="formLoading || imageUploading || fileUploading"
+            @click="closeEditor"
             >关闭</el-button
           >
         </div>
@@ -80,7 +90,9 @@
         class="mb-20px grid grid-cols-[minmax(0,2fr)_minmax(240px,1fr)] gap-16px max-[800px]:grid-cols-1"
       >
         <div class="min-w-0">
-          <div class="mb-8px text-13px text-[var(--el-text-color-secondary)]">文档标题</div>
+          <div class="mb-8px text-13px text-[var(--el-text-color-secondary)]">{{
+            formData.type === PmsKnowledgeDocumentType.FILE ? '知识库显示名称' : '文档标题'
+          }}</div>
           <el-form-item class="!mb-0" prop="title">
             <el-input
               v-model="formData.title"
@@ -125,16 +137,28 @@
       </el-form-item>
       <el-form-item v-else class="!mb-0" prop="content">
         <div class="w-full">
+          <div class="mb-8px text-13px text-[var(--el-text-color-secondary)]"
+            >当前版本文件（存储名）</div
+          >
+          <div class="mb-16px break-all"
+            >{{ currentFileName || '当前文件' }}
+            <span class="text-12px text-[var(--el-text-color-secondary)]"
+              >（保存前保持不变）</span
+            ></div
+          >
+          <div class="mb-8px text-13px text-[var(--el-text-color-secondary)]">上传新版本文件</div>
           <UploadFile
-            v-model="formData.content"
+            v-model="replacementFile"
             :file-size="PmsKnowledgeUploadFileSize"
             :file-type="[...PmsKnowledgeUploadFileTypes]"
             :limit="1"
-            @update:model-value="handleFileChange"
+            @update:model-value="handleReplacementChange"
+            @update:file-name="handleFileNameChange"
             @update:file-size="handleFileSizeChange"
+            @update:uploading="fileUploading = $event"
           />
           <div class="mt-8px text-12px text-[var(--el-text-color-secondary)]">
-            上传新文件并保存后会生成历史版本；在线预览为只读。
+            上传文件名是本次选择的原始文件名；知识库显示名称可单独修改。保存后新文件成为当前版本，旧文件保留在历史版本。
           </div>
         </div>
       </el-form-item>
@@ -168,6 +192,11 @@ let draftSaver: ReturnType<typeof createKnowledgeDraftSaver> | undefined
 const markdownEditorRef = ref<InstanceType<typeof KnowledgeMarkdownEditor>>()
 const editorReady = ref(false)
 const imageUploading = ref(false)
+const fileUploading = ref(false)
+const replacementFile = ref('')
+const currentFileName = ref('')
+const originalFileType = ref<string>()
+const originalFileSize = ref<number>()
 let originalFileKey = ''
 const formData = ref(getDefaultFormData()) // 表单数据
 const formRules = reactive({
@@ -185,6 +214,9 @@ async function open(id: number) {
   dialogVisible.value = true
   editorReady.value = false
   imageUploading.value = false
+  fileUploading.value = false
+  replacementFile.value = ''
+  currentFileName.value = ''
   previewing.value = false
   formData.value = getDefaultFormData()
   formRef.value?.resetFields()
@@ -206,6 +238,13 @@ async function open(id: number) {
       fileType: document.fileType,
       fileSize: document.fileSize,
       status: document.status
+    }
+    if (document.type === PmsKnowledgeDocumentType.FILE) {
+      currentFileName.value = decodeURIComponent(
+        (document.content || '').split('?')[0].split('/').pop() || ''
+      )
+      originalFileType.value = document.fileType
+      originalFileSize.value = document.fileSize
     }
     if (document.type === PmsKnowledgeDocumentType.RICH_TEXT) {
       const draft = await KnowledgeDocumentApi.getKnowledgeDocumentDraft(id)
@@ -265,7 +304,7 @@ function continueCurrentVersion() {
 
 /** 提交表单 */
 async function submitForm() {
-  if (formLoading.value || imageUploading.value || staleDraft.value) return
+  if (formLoading.value || imageUploading.value || fileUploading.value || staleDraft.value) return
   syncEditorContent()
   // 校验表单
   if (!formRef.value) return
@@ -290,7 +329,7 @@ async function submitForm() {
       id: formData.value.id!,
       expectedVersionNo: formData.value.expectedVersionNo,
       title: formData.value.title,
-      content: formData.value.content,
+      content: replacementFile.value || formData.value.content,
       labelIds: formData.value.labelIds,
       fileType: formData.value.fileType,
       fileSize: formData.value.fileSize
@@ -388,12 +427,12 @@ async function beforeCloseEditor(done: () => void) {
 }
 
 async function closeEditor() {
-  if (formLoading.value || imageUploading.value) return false
+  if (formLoading.value || imageUploading.value || fileUploading.value) return false
   syncEditorContent()
   if (draftTimer) clearTimeout(draftTimer)
   if (
     formData.value.type === PmsKnowledgeDocumentType.FILE &&
-    JSON.stringify(formData.value) !== originalFileKey
+    (JSON.stringify(formData.value) !== originalFileKey || Boolean(replacementFile.value))
   ) {
     try {
       await message.confirm('文件修改尚未保存，确认放弃修改并关闭吗？')
@@ -456,8 +495,8 @@ function warnUnsavedChanges(event: BeforeUnloadEvent) {
   const unsaved =
     formData.value.type === PmsKnowledgeDocumentType.RICH_TEXT
       ? draftReady.value && !draftSaver?.isSaved(draftPayload())
-      : JSON.stringify(formData.value) !== originalFileKey
-  if (unsaved || imageUploading.value) {
+      : JSON.stringify(formData.value) !== originalFileKey || Boolean(replacementFile.value)
+  if (unsaved || imageUploading.value || fileUploading.value) {
     event.preventDefault()
     event.returnValue = ''
   }
@@ -483,13 +522,18 @@ onBeforeRouteUpdate(async () => !dialogVisible.value || (await closeEditor()))
 
 /** 文件重新上传后更新文件大小元数据 */
 function handleFileSizeChange(value?: number) {
-  formData.value.fileSize = value
+  formData.value.fileSize = value ?? originalFileSize.value
+}
+
+function handleReplacementChange(value: string) {
+  if (!value) {
+    formData.value.fileType = originalFileType.value
+    formData.value.fileSize = originalFileSize.value
+  }
 }
 
 /** 文件替换后同步扩展名元数据 */
-function handleFileChange(value: string) {
-  if (!value) return
-  const fileName = decodeURIComponent(value.split('?')[0].split('/').pop() || '')
+function handleFileNameChange(fileName: string) {
   formData.value.fileType = fileName.includes('.')
     ? fileName.split('.').pop()?.toLowerCase()
     : undefined

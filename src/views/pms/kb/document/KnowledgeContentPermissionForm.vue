@@ -38,7 +38,7 @@
               @change="handleIdentityTypeChange(scope.row)"
             >
               <el-option label="成员" :value="PmsKnowledgeContentIdentityType.USER" />
-              <el-option label="部门" :value="PmsKnowledgeContentIdentityType.DEPT" />
+              <el-option label="部门（含下级）" :value="PmsKnowledgeContentIdentityType.DEPT" />
             </el-select>
           </template>
         </el-table-column>

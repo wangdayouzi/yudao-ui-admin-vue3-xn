@@ -71,7 +71,12 @@ import { UploadFile } from 'element-plus/es/components/upload/src/upload'
 defineOptions({ name: 'UploadFile' })
 
 const message = useMessage() // 消息弹窗
-const emit = defineEmits(['update:modelValue', 'update:fileSize'])
+const emit = defineEmits([
+  'update:modelValue',
+  'update:fileSize',
+  'update:fileName',
+  'update:uploading'
+])
 
 const props = defineProps({
   modelValue: propTypes.oneOfType<string | string[]>([String, Array<String>]).isRequired,
@@ -88,6 +93,7 @@ const props = defineProps({
 // ========== 上传相关 ==========
 const fileList = ref<UploadUserFile[]>([])
 const isUploading = computed(() => fileList.value.some((file) => file.status === 'uploading'))
+watch(isUploading, (value) => emit('update:uploading', value))
 let emittedModelValue: string | string[] | undefined // 区分自身回写与切换表单后的外部重置
 
 const { uploadUrl, httpRequest } = useUpload(props.directory)
@@ -153,6 +159,7 @@ const handleFileSuccess: UploadProps['onSuccess'] = (res: any, uploadFile): void
   message.success('上传成功')
   emitUpdateModelValue()
   emit('update:fileSize', fileSize)
+  emit('update:fileName', uploadFile.name)
 }
 // 文件数超出提示
 const handleExceed: UploadProps['onExceed'] = (): void => {

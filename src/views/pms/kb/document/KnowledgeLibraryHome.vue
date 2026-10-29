@@ -9,9 +9,6 @@
         {{ library?.description || '暂无简介' }}
       </div>
     </div>
-    <el-button class="!ml-auto shrink-0" type="primary" @click="emit('search')">
-      <Icon icon="ep:search" />搜索文档
-    </el-button>
     <!-- 知识库操作只在主页展示 -->
     <el-dropdown @command="handleMoreCommand">
       <el-button>更多</el-button>
@@ -100,7 +97,6 @@ const emit = defineEmits<{
   (event: 'attributes'): void
   (event: 'number-rule'): void
   (event: 'review'): void
-  (event: 'search'): void
   (event: 'node-click', node: KnowledgeTreeNode): void
   (event: 'tab-change', tab: 'all' | 'favorite'): void
 }>() // 组件事件

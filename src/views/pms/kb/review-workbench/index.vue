@@ -33,26 +33,34 @@
     </el-form>
     <el-table v-loading="loading" :data="pageRows" :show-overflow-tooltip="true">
       <el-table-column label="文件" min-width="250">
-        <template #default="{ row }"><el-link type="primary" @click="openReview(row)">{{ row.title }}</el-link></template>
+        <template #default="{ row }"><el-link type="primary" @click="openDocument(row)">{{ row.title }}</el-link></template>
       </el-table-column>
       <el-table-column prop="documentCode" label="文档编号" min-width="160" />
       <el-table-column label="知识库" min-width="150"><template #default="{ row }">{{ libraryNames[row.libraryId] || row.libraryId }}</template></el-table-column>
       <el-table-column label="状态" width="130"><template #default="{ row }"><el-tag :type="stageTag(row.stage)">{{ stageName(row.stage) }}</el-tag></template></el-table-column>
       <el-table-column label="最近结论" width="110"><template #default="{ row }">{{ resultName(row.result) }}</template></el-table-column>
       <el-table-column prop="dueDate" label="应审日期" width="120" />
-      <el-table-column label="操作" width="150" fixed="right">
+      <el-table-column label="操作" width="110" fixed="right">
         <template #default="{ row }">
-          <el-button link type="primary" @click="openReview(row)">审阅记录</el-button>
-          <el-button link @click="openDocument(row)">查看文档</el-button>
+          <el-button link type="primary" @click="openReview(row)">审阅</el-button>
         </template>
       </el-table-column>
     </el-table>
     <Pagination v-model:page="pageNo" v-model:limit="pageSize" :total="filteredRows.length" />
   </ContentWrap>
-  <el-drawer v-model="drawerVisible" :title="selected?.title || '审阅记录'" size="min(620px, 100%)">
+  <el-drawer v-model="drawerVisible" :title="selected?.title || '有效性审阅'" size="min(900px, 100%)">
     <div v-if="selected" class="mb-14px text-13px text-[var(--el-text-color-secondary)]">
       {{ selected.documentCode }} · {{ libraryNames[selected.libraryId] }} · 应审日期：{{ selected.dueDate || '未配置周期' }}
     </div>
+    <div v-loading="historyLoading" class="mb-20px min-h-180px border border-solid border-[var(--el-border-color)] p-12px">
+      <template v-if="documentDetail">
+        <KnowledgeMarkdownPreview v-if="documentDetail.type === 3" :content="documentDetail.content" />
+        <KnowledgeOfficePreview v-else-if="documentDetail.previewUrl && isPmsKnowledgeOfficeFile(documentDetail.fileType)" :document-id="documentDetail.id" :version-no="documentDetail.versionNo" />
+        <FilePreview v-else-if="documentDetail.previewUrl || documentDetail.content" :downloadable="documentDetail.downloadStatus" :file-name="documentDetail.title" :file-type="documentDetail.fileType" :url="documentDetail.previewUrl || documentDetail.content" />
+        <el-empty v-else description="文件暂无可用预览" />
+      </template>
+    </div>
+    <el-divider content-position="left">审阅记录</el-divider>
     <el-table v-loading="historyLoading" :data="history" class="mb-20px">
       <el-table-column prop="reviewDate" label="日期" width="115" />
       <el-table-column label="结论" width="90"><template #default="{ row }">{{ resultName(row.result) }}</template></el-table-column>
@@ -71,6 +79,7 @@
       </el-form>
       <el-button v-hasPermi="['pms:kb:library:update']" type="primary" :loading="submitting" @click="saveReview">提交审阅</el-button>
     </template>
+    <div class="mt-20px flex justify-end"><el-button :disabled="!nextRow" @click="openNext">下一份</el-button></div>
   </el-drawer>
 </template>
 
@@ -80,9 +89,12 @@ import * as KnowledgeDocumentApi from '@/api/pms/kb/content/document'
 import { getReviewHistory, getReviewWorkbench, submitReview, type KnowledgeReviewRecordVO, type KnowledgeReviewWorkbenchVO } from '@/api/pms/kb/review'
 import { getAllPageItems } from '@/utils/page'
 import { canEditKnowledgeContent } from '@/views/pms/kb/utils/permission'
+import KnowledgeMarkdownPreview from '../document/KnowledgeMarkdownPreview.vue'
+import KnowledgeOfficePreview from '../document/KnowledgeOfficePreview.vue'
+import FilePreview from '@/components/FilePreview/src/FilePreview.vue'
+import { isPmsKnowledgeOfficeFile } from '@/views/pms/kb/utils/constants'
 
 defineOptions({ name: 'PmsKnowledgeReviewWorkbench' })
-const router = useRouter()
 const route = useRoute()
 const message = useMessage()
 const loading = ref(false)
@@ -98,9 +110,16 @@ const pageSize = ref(10)
 const drawerVisible = ref(false)
 const selected = ref<KnowledgeReviewWorkbenchVO>()
 const history = ref<KnowledgeReviewRecordVO[]>([])
+const documentDetail = ref<KnowledgeDocumentApi.PmsKnowledgeDocumentVO>()
+const nextRow = computed(() => {
+  const index = filteredRows.value.findIndex(row => row.documentId === selected.value?.documentId)
+  return index < 0 ? filteredRows.value[0] : filteredRows.value[index + 1]
+})
 const canSubmit = ref(false)
 const reviewResult = ref('valid')
 const remark = ref('')
+let historyRequest = 0
+let rowsRequest = 0
 const libraryNames = computed(() => Object.fromEntries(libraries.value.map(item => [item.id, item.name])))
 const filteredRows = computed(() => rows.value.filter(row =>
   (stage.value === 'all' || row.stage === stage.value) && (result.value === 'all' || row.result === result.value)))
@@ -110,38 +129,55 @@ function stageName(value: string) { return ({ overdue: '逾期待审', upcoming:
 function stageTag(value: string): 'danger' | 'warning' | 'info' | 'success' { return value === 'overdue' ? 'danger' : value === 'upcoming' ? 'warning' : value === 'normal' ? 'success' : 'info' }
 function resultName(value: string) { return ({ unreviewed: '未审阅', valid: '有效', pending: '待确认', replaced: '已替代', abolished: '已作废' } as Record<string, string>)[value] || value }
 async function loadRows() {
+  const request = ++rowsRequest
   loading.value = true
-  try { rows.value = await getReviewWorkbench(libraryId.value); pageNo.value = 1 }
-  finally { loading.value = false }
+  try { const data = await getReviewWorkbench(libraryId.value); if (request === rowsRequest) { rows.value = data; pageNo.value = 1 } }
+  finally { if (request === rowsRequest) loading.value = false }
 }
 async function openReview(row: KnowledgeReviewWorkbenchVO) {
+  const request = ++historyRequest
   selected.value = row
   drawerVisible.value = true
   historyLoading.value = true
   canSubmit.value = false
+  history.value = []
+  documentDetail.value = undefined
   reviewResult.value = 'valid'
   remark.value = ''
   try {
     const [records, document] = await Promise.all([getReviewHistory(row.documentId), KnowledgeDocumentApi.getKnowledgeDocument(row.documentId)])
-    if (selected.value?.documentId !== row.documentId) return
+    if (request !== historyRequest || !drawerVisible.value) return
     history.value = records
+    documentDetail.value = document
     canSubmit.value = canEditKnowledgeContent(document.currentUserLevel)
-  } finally { historyLoading.value = false }
+  } catch (error) {
+    if (request === historyRequest) {
+      message.error('文档或审阅记录加载失败，请重试')
+      drawerVisible.value = false
+    }
+  } finally { if (request === historyRequest) historyLoading.value = false }
 }
-function openDocument(row: KnowledgeReviewWorkbenchVO) { router.push(`/pms/kb/library/${row.libraryId}/document/${row.documentId}`) }
+function openDocument(row: KnowledgeReviewWorkbenchVO) { openReview(row) }
+function openNext() { if (nextRow.value) openReview(nextRow.value) }
 async function saveReview() {
-  if (!selected.value) return
+  if (!selected.value || submitting.value || !canSubmit.value) return
+  const documentId = selected.value.documentId
+  const request = historyRequest
   if (['replaced', 'abolished'].includes(reviewResult.value) && !remark.value.trim()) { message.warning('替代或作废需要填写原因'); return }
   submitting.value = true
   try {
-    await submitReview({ documentId: selected.value.documentId, result: reviewResult.value, remark: remark.value })
+    await submitReview({ documentId, result: reviewResult.value, remark: remark.value.trim() })
     message.success('审阅记录已保存')
-    history.value = await getReviewHistory(selected.value.documentId)
+    const records = await getReviewHistory(documentId)
     await loadRows()
-    selected.value = rows.value.find(row => row.documentId === selected.value?.documentId)
-    remark.value = ''
+    if (request === historyRequest && drawerVisible.value) {
+      history.value = records
+      selected.value = rows.value.find(row => row.documentId === documentId)
+      remark.value = ''
+    }
   } finally { submitting.value = false }
 }
+watch(drawerVisible, (visible) => { if (!visible) ++historyRequest })
 onMounted(async () => {
   libraries.value = await getAllPageItems<KnowledgeLibraryApi.PmsKnowledgeLibraryVO>(
     (pageNo, pageSize) => KnowledgeLibraryApi.getKnowledgeLibraryPage({ pageNo, pageSize }))

@@ -20,7 +20,7 @@
               @change="handleIdentityTypeChange(scope.row)"
             >
               <el-option label="成员" value="user" />
-              <el-option label="部门" value="dept" />
+              <el-option label="部门（含下级）" value="dept" />
             </el-select>
           </template>
         </el-table-column>

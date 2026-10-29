@@ -23,16 +23,18 @@
           :is-show-tip="true"
           :limit="1"
           @update:model-value="handleFileChange"
+          @update:file-name="handleOriginalFileName"
           @update:file-size="handleFileSizeChange"
+          @update:uploading="fileUploading = $event"
         />
       </el-form-item>
-      <el-form-item label="文件名称" prop="title">
+      <el-form-item label="知识库显示名称" prop="title">
         <el-input
           ref="nameInputRef"
           @keydown.enter="confirmKnowledgeName($event, submitForm)"
           v-model="formData.title"
           maxlength="255"
-          placeholder="上传后自动填充，可修改"
+          placeholder="用于知识库列表和搜索，可与上传文件名不同"
         />
       </el-form-item>
       <el-alert
@@ -52,7 +54,7 @@
     <template #footer>
       <el-button
         :loading="formLoading"
-        :disabled="ruleChecking || Boolean(ruleHint)"
+        :disabled="ruleChecking || Boolean(ruleHint) || fileUploading"
         type="primary"
         @click="submitForm"
         >完成上传</el-button
@@ -80,6 +82,7 @@ defineOptions({ name: 'PmsKnowledgeFileUploadForm' })
 const message = useMessage() // 消息弹窗
 const dialogVisible = ref(false) // 弹窗是否显示
 const formLoading = ref(false) // 表单提交中
+const fileUploading = ref(false)
 const ruleChecking = ref(false)
 const ruleHint = ref('')
 let ruleCheckVersion = 0
@@ -88,14 +91,14 @@ function focusName() {
   nameInputRef.value?.focus()
 }
 function beforeClose(done: () => void) {
-  if (!formLoading.value) done()
+  if (!formLoading.value && !fileUploading.value) done()
 }
 const formRef = ref() // 表单 Ref
 const attributeRef = ref<InstanceType<typeof KnowledgeAttributeFields>>()
 const formData = ref(getDefaultFormData()) // 表单数据
 const allowedFileTypes = [...PmsKnowledgeUploadFileTypes] // 允许上传的文件类型
 const formRules = reactive({
-  title: [{ required: true, whitespace: true, message: '请输入文件名称', trigger: 'blur' }],
+  title: [{ required: true, whitespace: true, message: '请输入知识库显示名称', trigger: 'blur' }],
   content: [{ required: true, message: '请上传文件', trigger: 'change' }]
 }) // 表单校验规则
 const emit = defineEmits(['success']) // 定义 success 事件，用于操作成功后的回调
@@ -103,6 +106,7 @@ const emit = defineEmits(['success']) // 定义 success 事件，用于操作成
 /** 打开上传弹窗，并将文件归入当前目录 */
 function open(libraryId: number, folderId = PmsKnowledgeRootId, parentId = PmsKnowledgeRootId) {
   dialogVisible.value = true
+  fileUploading.value = false
   formData.value = {
     ...getDefaultFormData(),
     libraryId,
@@ -127,10 +131,13 @@ function open(libraryId: number, folderId = PmsKnowledgeRootId, parentId = PmsKn
 }
 defineExpose({ open }) // 提供 open 方法，用于打开弹窗
 
-/** 文件上传完成后，用文件地址填充名称和扩展名 */
+/** 文件地址只用于保存；展示名称和类型来自用户实际选择的文件名。 */
 function handleFileChange(value: string) {
   if (!value) return
-  const fileName = decodeURIComponent(value.split('?')[0].split('/').pop() || '')
+  formRef.value?.clearValidate('content')
+}
+
+function handleOriginalFileName(fileName: string) {
   formData.value.fileType = fileName.includes('.')
     ? fileName.split('.').pop()?.toLowerCase()
     : undefined
@@ -147,7 +154,7 @@ function handleFileSizeChange(value?: number) {
 
 /** 提交文件类型文档 */
 async function submitForm() {
-  if (formLoading.value || !formRef.value) return
+  if (formLoading.value || fileUploading.value || !formRef.value) return
   if (ruleChecking.value || ruleHint.value) return
   formLoading.value = true
   try {

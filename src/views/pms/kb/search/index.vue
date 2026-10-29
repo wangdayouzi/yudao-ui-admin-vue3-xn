@@ -27,6 +27,9 @@
           placeholder="请选择创建人"
         />
       </el-form-item>
+      <el-form-item label="属性值" prop="attributeKeyword">
+        <el-input v-model="queryParams.attributeKeyword" class="!w-240px" clearable placeholder="搜索文档属性值" @keyup.enter="handleQuery" />
+      </el-form-item>
       <el-form-item label="更新时间" prop="updateTime">
         <el-date-picker
           v-model="queryParams.updateTime"
@@ -52,7 +55,6 @@
       <el-button v-hasPermi="['pms:kb:library:update']" type="primary" @click="openCreate">
         <Icon icon="ep:plus" />新增知识
       </el-button>
-      <el-button @click="router.push('/pms/kb/review-workbench')">有效性审阅</el-button>
     </div>
     <el-table v-loading="loading" :data="list" :show-overflow-tooltip="true">
       <el-table-column label="文档标题" min-width="280">
@@ -169,6 +171,7 @@ const queryParams = reactive({
   pageNo: 1,
   pageSize: 10,
   keyword: String(route.query.keyword || ''),
+  attributeKeyword: String(route.query.attributeKeyword || ''),
   libraryId: route.query.libraryId ? Number(route.query.libraryId) : undefined,
   creatorUserId: route.query.creatorUserId ? Number(route.query.creatorUserId) : undefined,
   updateTime: route.query.updateTime ? String(route.query.updateTime).split(',') : ([] as string[])
@@ -339,6 +342,7 @@ watch(
   () => route.query,
   (query) => {
     queryParams.keyword = String(query.keyword || '')
+    queryParams.attributeKeyword = String(query.attributeKeyword || '')
     queryParams.libraryId = query.libraryId ? Number(query.libraryId) : undefined
     queryParams.creatorUserId = query.creatorUserId ? Number(query.creatorUserId) : undefined
     queryParams.updateTime = query.updateTime ? String(query.updateTime).split(',') : []

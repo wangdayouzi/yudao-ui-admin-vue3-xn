@@ -58,6 +58,9 @@
         <template v-if="activeView === 'recycle'"
           ><Icon icon="ep:arrow-right" class="text-10px" /><span>最近删除</span></template
         >
+        <el-input v-model="librarySearchKeyword" class="!ml-auto !w-220px shrink-0" clearable placeholder="在此知识库搜索" @keyup.enter="handleLibrarySearch">
+          <template #append><el-button aria-label="搜索" @click="handleLibrarySearch"><Icon icon="ep:search" /></el-button></template>
+        </el-input>
       </nav>
       <KnowledgeRecyclePanel
         v-if="activeView === 'recycle'"
@@ -106,7 +109,6 @@
         @exit="handleExitLibrary"
         @member="memberFormRef?.open(libraryId)"
         @node-click="handleNodeClick"
-        @search="handleLibrarySearch"
         @tab-change="handleLibraryTabChange"
       />
     </ContentWrap>
@@ -178,6 +180,7 @@ const message = useMessage() // 消息弹窗
 const libraryId = computed(() => Number(route.params.libraryId)) // 知识库编号
 const loading = ref(false) // 页面加载中
 const activeView = ref<KnowledgeContentView>('home') // 当前右侧内容
+const librarySearchKeyword = ref('')
 const library = ref<KnowledgeLibraryApi.PmsKnowledgeLibraryVO>() // 知识库详情
 const savedSidebarState = localStorage.getItem('pms-kb-sidebar-visible')
 const sidebarVisible = ref(window.innerWidth > 900 && savedSidebarState !== 'false')
@@ -509,7 +512,7 @@ async function deleteDocument(document: KnowledgeDocumentApi.PmsKnowledgeDocumen
 
 /** 从知识库主页进入限定当前知识库的搜索 */
 function handleLibrarySearch() {
-  router.push({ path: '/pms/kb/search', query: { libraryId: String(libraryId.value) } })
+  router.push({ path: '/pms/kb/search', query: { libraryId: String(libraryId.value), keyword: librarySearchKeyword.value.trim() || undefined } })
 }
 
 /** 打开知识库主页 */
