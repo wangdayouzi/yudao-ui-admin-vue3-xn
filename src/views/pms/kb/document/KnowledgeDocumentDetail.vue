@@ -80,19 +80,26 @@
         </el-dropdown>
       </div>
     </div>
-    <div
-      class="mt-4px flex flex-wrap items-center gap-x-10px gap-y-4px text-12px text-[var(--el-text-color-secondary)]"
-    >
-      <span v-if="document.creatorUserName">{{ document.creatorUserName }} 创建于</span>
-      <span>{{ formatDate(document.createTime) }}</span>
-      <el-tag size="small" :type="getKnowledgeDocumentStatusTagType(document.status)">
-        {{ getKnowledgeDocumentStatusName(document.status) }}
-      </el-tag>
-      <template v-if="document.type === PmsKnowledgeDocumentType.FILE">
-        <el-tag size="small" type="info">{{ document.fileType || '文件' }}</el-tag>
-        <span v-if="document.fileSize !== undefined">{{
-          formatKnowledgeFileSize(document.fileSize)
-        }}</span>
+    <div class="mt-4px flex flex-wrap items-center justify-between gap-x-16px gap-y-4px">
+      <div
+        class="flex min-w-0 flex-wrap items-center gap-x-10px gap-y-4px text-12px text-[var(--el-text-color-secondary)]"
+      >
+        <span v-if="document.creatorUserName">{{ document.creatorUserName }} 创建于</span>
+        <span>{{ formatDate(document.createTime) }}</span>
+        <el-tag size="small" :type="getKnowledgeDocumentStatusTagType(document.status)">
+          {{ getKnowledgeDocumentStatusName(document.status) }}
+        </el-tag>
+        <template v-if="document.type === PmsKnowledgeDocumentType.FILE">
+          <el-tag size="small" type="info">{{ document.fileType || '文件' }}</el-tag>
+          <span v-if="document.fileSize !== undefined">{{
+            formatKnowledgeFileSize(document.fileSize)
+          }}</span>
+        </template>
+      </div>
+      <div
+        v-if="document.type === PmsKnowledgeDocumentType.FILE"
+        class="ml-auto flex shrink-0 items-center gap-12px"
+      >
         <el-link
           v-if="document.downloadStatus"
           :href="document.content"
@@ -100,11 +107,16 @@
           type="primary"
           >下载文件</el-link
         >
-        <span v-else>仅可在线预览</span>
-        <el-button v-if="document.previewUrl" link size="small" @click="previewExpanded = true"
+        <span v-else class="text-12px text-[var(--el-text-color-secondary)]">仅可在线预览</span>
+        <el-button
+          v-if="document.previewUrl"
+          class="!ml-0"
+          link
+          size="small"
+          @click="previewExpanded = true"
           >放大查看</el-button
         >
-      </template>
+      </div>
     </div>
     <div v-if="labels.length" class="mt-4px flex flex-wrap items-center gap-8px">
       <span
@@ -247,7 +259,7 @@
         ><template #default="{ row }">{{ reviewResultName(row.result) }}</template></el-table-column
       >
       <el-table-column prop="remark" label="备注" />
-      <el-table-column prop="reviewerId" label="审阅人 ID" width="110" />
+      <el-table-column prop="reviewerName" label="审阅人" width="110" />
     </el-table>
     <template v-if="canEditKnowledgeContent(document.currentUserLevel)">
       <el-form label-width="80px">

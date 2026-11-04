@@ -11,8 +11,14 @@ export interface PmsKnowledgeDocumentVO {
   parentId: number // 父文档编号
   title: string // 文档标题
   documentCode?: string // 固定业务编号
+  reviewResult?: string // 最新有效性审阅结论（搜索结果）
   attributes?: Record<string, string> // 当前属性值
-  carriedAttributes?: Array<{ fieldName: string; fieldCode: string; sourceLibraryId: number; value: string }>
+  carriedAttributes?: Array<{
+    fieldName: string
+    fieldCode: string
+    sourceLibraryId: number
+    value: string
+  }>
   contentSummary?: string // 正文摘要
   content: string // 文档内容或文件地址
   previewUrl?: string // 文件预览地址
@@ -104,7 +110,8 @@ export interface PmsKnowledgeDocumentDraftVO {
 
 export const getKnowledgeDocumentDraft = (documentId: number) =>
   request.get<PmsKnowledgeDocumentDraftVO | undefined>({
-    url: '/pms/kb/document/draft-get', params: { documentId }
+    url: '/pms/kb/document/draft-get',
+    params: { documentId }
   })
 
 export const saveKnowledgeDocumentDraft = (data: PmsKnowledgeDocumentDraftVO) =>
@@ -131,35 +138,43 @@ export interface PmsKnowledgeDocumentVersionVO {
 
 export const getKnowledgeDocumentVersionList = (documentId: number) =>
   request.get<PmsKnowledgeDocumentVersionVO[]>({
-    url: '/pms/kb/document/version-list', params: { documentId }
+    url: '/pms/kb/document/version-list',
+    params: { documentId }
   })
 
 export const getKnowledgeDocumentVersion = (documentId: number, versionNo: number) =>
   request.get<PmsKnowledgeDocumentVersionVO>({
-    url: '/pms/kb/document/version-get', params: { documentId, versionNo }
+    url: '/pms/kb/document/version-get',
+    params: { documentId, versionNo }
   })
 
 export const getKnowledgeOfficePreviewConfig = (documentId: number) =>
   request.get<Record<string, any>>({
-    url: '/pms/kb/document/office-preview-config', params: { documentId }
+    url: '/pms/kb/document/office-preview-config',
+    params: { documentId }
   })
 
 export const getKnowledgeOfficeHistoryPreviewConfig = (documentId: number, versionNo: number) =>
   request.get<Record<string, any>>({
-    url: '/pms/kb/document/office-history-preview-config', params: { documentId, versionNo }
+    url: '/pms/kb/document/office-history-preview-config',
+    params: { documentId, versionNo }
   })
 
 export const getKnowledgeHistoryPreviewUrl = (documentId: number, versionNo: number) =>
   request.get<string>({
-    url: '/pms/kb/document/history-preview-url', params: { documentId, versionNo }
+    url: '/pms/kb/document/history-preview-url',
+    params: { documentId, versionNo }
   })
 
 export const restoreKnowledgeDocumentVersion = (
-  documentId: number, versionNo: number, expectedVersionNo: number
-) => request.put({
-  url: '/pms/kb/document/version-restore',
-  params: { documentId, versionNo, expectedVersionNo }
-})
+  documentId: number,
+  versionNo: number,
+  expectedVersionNo: number
+) =>
+  request.put({
+    url: '/pms/kb/document/version-restore',
+    params: { documentId, versionNo, expectedVersionNo }
+  })
 
 // 删除知识库文档
 export const deleteKnowledgeDocument = (id: number) => {

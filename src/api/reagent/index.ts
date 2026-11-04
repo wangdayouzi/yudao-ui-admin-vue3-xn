@@ -189,6 +189,9 @@ export const checkSampleLoanDuplicate = (params: {
   requesterId: number
   excludeId?: number
 }): Promise<boolean> => {
+  if (!params.location?.trim()) {
+    return Promise.reject(new Error('请选择楼层'))
+  }
   return request.get({ url: '/reagent/sample-loan/check-duplicate', params })
 }
 
@@ -204,6 +207,9 @@ export const noReturnSampleLoan = (id: number) => {
 export const getBorrowingSampleLoanList = (
   location: string
 ): Promise<SampleLoanVO[]> => {
+  if (!location?.trim()) {
+    return Promise.reject(new Error('请选择楼层'))
+  }
   return request.get({
     url: '/reagent/sample-loan/screen-list',
     params: { location },

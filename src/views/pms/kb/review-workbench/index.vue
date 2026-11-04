@@ -65,7 +65,7 @@
       <el-table-column prop="reviewDate" label="日期" width="115" />
       <el-table-column label="结论" width="90"><template #default="{ row }">{{ resultName(row.result) }}</template></el-table-column>
       <el-table-column prop="remark" label="备注" min-width="160" />
-      <el-table-column prop="reviewerId" label="审阅人 ID" width="105" />
+      <el-table-column prop="reviewerName" label="审阅人" width="105" />
     </el-table>
     <el-empty v-if="!historyLoading && !history.length" description="暂无审阅记录" />
     <template v-if="canSubmit">

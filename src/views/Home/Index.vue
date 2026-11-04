@@ -1,239 +1,217 @@
 <template>
-  <div>
-    <el-card shadow="never">
-      <el-skeleton :loading="loading" animated>
-        <el-row :gutter="16" justify="space-between">
-          <el-col :xl="12" :lg="12" :md="12" :sm="24" :xs="24">
-            <div class="flex items-center">
-              <el-avatar :src="avatar" :size="70" class="mr-16px">
-                <img src="@/assets/imgs/avatar.gif" alt="" />
-              </el-avatar>
-              <div>
-                <div class="text-20px">
-                  {{ t('workplace.welcome') }} {{ username }} {{ t('workplace.happyDay') }}
+  <div class="space-y-8px">
+    <el-card shadow="never" class="home-section">
+      <template #header>
+        <div class="flex items-center justify-between">
+          <span class="font-600">最近使用的模块</span>
+          <span class="text-12px text-[var(--el-text-color-secondary)]">最近访问的 8 个模块</span>
+        </div>
+      </template>
+      <div v-if="!recentModules.length" class="home-empty">访问模块后，这里会显示最近使用记录</div>
+      <div v-else class="grid grid-cols-2 gap-8px md:grid-cols-3 xl:grid-cols-6">
+        <div
+          v-for="item in recentModules"
+          :key="item.path"
+          class="home-entry flex min-w-0 items-center gap-12px"
+        >
+          <button
+            class="flex min-w-0 flex-1 items-center gap-8px text-left"
+            type="button"
+            @click="openModule(item.path)"
+          >
+            <Icon :icon="item.icon" :size="20" class="shrink-0 text-[var(--el-color-primary)]" />
+            <span class="truncate text-14px" :title="item.title">{{ item.title }}</span>
+          </button>
+          <el-button
+            link
+            :title="isFavorite(item.path) ? '取消常用' : '加入常用'"
+            @click="toggleFavorite(item.path)"
+          >
+            <Icon
+              :icon="isFavorite(item.path) ? 'ep:star-filled' : 'ep:star'"
+              :size="18"
+              :class="isFavorite(item.path) ? 'text-[var(--el-color-warning)]' : ''"
+            />
+          </el-button>
+        </div>
+      </div>
+    </el-card>
+
+    <el-card shadow="never" class="home-section">
+      <template #header>
+        <div class="flex flex-wrap items-center justify-between gap-8px">
+          <span class="font-600">我的常用模块</span>
+          <el-select v-model="moduleToAdd" class="!w-220px" filterable clearable placeholder="添加常用模块" @change="addFavorite">
+            <el-option v-for="item in availableModules" :key="item.path" :label="item.title" :value="item.path" />
+          </el-select>
+        </div>
+      </template>
+      <div v-if="!favoriteModules.length" class="home-empty">点击模块旁的星标，添加常用模块</div>
+      <div v-else class="grid grid-cols-2 gap-8px md:grid-cols-3 xl:grid-cols-6">
+        <div
+          v-for="item in favoriteModules"
+          :key="item.path"
+          class="home-entry flex min-w-0 items-center gap-12px"
+        >
+          <button
+            class="flex min-w-0 flex-1 items-center gap-8px text-left"
+            type="button"
+            @click="openModule(item.path)"
+          >
+            <Icon :icon="item.icon" :size="20" class="shrink-0 text-[var(--el-color-primary)]" />
+            <span class="truncate text-14px" :title="item.title">{{ item.title }}</span>
+          </button>
+          <el-button link title="取消常用" @click="toggleFavorite(item.path)"
+            ><Icon icon="ep:star-filled" :size="18" class="text-[var(--el-color-warning)]"
+          /></el-button>
+        </div>
+      </div>
+    </el-card>
+
+    <el-card shadow="never" class="home-section">
+      <template #header><span class="font-600">系统导航</span></template>
+      <div class="grid grid-cols-2 gap-8px md:grid-cols-3 xl:grid-cols-6">
+        <button
+          v-for="item in navLinks"
+          :key="item.url"
+          type="button"
+          class="home-entry flex min-w-0 items-center gap-12px text-left"
+          @click="handleNavClick(item.url)"
+        >
+          <Icon :icon="item.icon" :size="20" class="shrink-0" :style="{ color: item.color }" />
+          <span class="truncate text-14px" :title="item.name">{{ item.name }}</span>
+        </button>
+      </div>
+    </el-card>
+
+    <!-- ==================== IT 工具箱 ==================== -->
+    <el-card v-if="toolboxTools.length > 0" shadow="never" class="home-section mt-8px">
+      <template #header>
+        <div class="h-3 flex justify-between">
+          <span>IT 工具箱</span>
+        </div>
+      </template>
+      <el-row :gutter="8" class="gap-y-8px">
+        <el-col
+          v-for="(item, index) in toolboxTools"
+          :key="`toolbox-${index}`"
+          :xl="6"
+          :lg="6"
+          :md="8"
+          :sm="12"
+          :xs="12"
+          class="!flex"
+        >
+          <el-card shadow="never" class="home-tool flex-1" body-class="!p-12px">
+            <!-- 第一行：图标 + 名称 + 说明按钮 -->
+            <div class="flex items-center gap-x-6px">
+              <el-image
+                v-if="isToolIconUrl(item.icon)"
+                :src="item.icon"
+                class="h-18px w-18px flex-none"
+                fit="contain"
+              />
+              <Icon
+                v-else-if="item.icon"
+                :icon="item.icon"
+                :size="18"
+                class="flex-none"
+                :style="{ color: '#409EFF' }"
+              />
+              <span class="min-w-0 flex-1 truncate text-13px" :title="item.name">{{
+                item.name
+              }}</span>
+              <el-popover :width="260" trigger="click">
+                <template #reference>
+                  <el-button link type="primary" class="!p-0 !text-12px">
+                    <Icon icon="ep:info-filled" class="mr-2px" /> 说明
+                  </el-button>
+                </template>
+                <div class="text-13px">
+                  <div class="mb-8px text-14px font-bold">{{ item.name }}</div>
+                  <div class="text-gray-500" style="white-space: pre-line">
+                    {{ item.description || '暂无说明' }}
+                  </div>
                 </div>
-                <div class="mt-10px text-14px text-gray-500">
-                  {{ t('workplace.toady') }}，20℃ - 32℃！
-                </div>
-              </div>
+              </el-popover>
             </div>
-          </el-col>
-          <el-col :xl="12" :lg="12" :md="12" :sm="24" :xs="24">
-            <div class="h-70px flex items-center justify-end lt-sm:mt-10px">
-              <div class="px-8px text-right">
-                <div class="mb-16px text-14px text-gray-400">{{ t('workplace.project') }}</div>
-                <CountTo
-                  class="text-20px"
-                  :start-val="0"
-                  :end-val="totalSate.project"
-                  :duration="2600"
-                />
+            <!-- 第二行：分类/版本 + 下载（下载在版本后面） -->
+            <div
+              v-if="item.category || item.version"
+              class="mt-6px flex items-center justify-between gap-x-6px"
+            >
+              <div class="flex min-w-0 items-center">
+                <el-tag v-if="item.category" size="small">{{ item.category }}</el-tag>
+                <el-tag v-if="item.version" size="small" type="info" class="ml-6px">
+                  {{ item.version }}
+                </el-tag>
               </div>
-              <el-divider direction="vertical" />
-              <div class="px-8px text-right">
-                <div class="mb-16px text-14px text-gray-400">{{ t('workplace.toDo') }}</div>
-                <CountTo
-                  class="text-20px"
-                  :start-val="0"
-                  :end-val="totalSate.todo"
-                  :duration="2600"
-                />
-              </div>
-              <el-divider direction="vertical" border-style="dashed" />
-              <div class="px-8px text-right">
-                <div class="mb-16px text-14px text-gray-400">{{ t('workplace.access') }}</div>
-                <CountTo
-                  class="text-20px"
-                  :start-val="0"
-                  :end-val="totalSate.access"
-                  :duration="2600"
-                />
-              </div>
+              <el-button size="small" type="primary" @click="handleToolDownload(item)">
+                <Icon icon="ep:download" class="mr-5px" /> 下载
+              </el-button>
             </div>
-          </el-col>
-        </el-row>
-      </el-skeleton>
+          </el-card>
+        </el-col>
+      </el-row>
     </el-card>
   </div>
-
-  <el-row class="mt-8px" :gutter="8" justify="space-between">
-    <el-col :xl="16" :lg="16" :md="24" :sm="24" :xs="24" class="mb-8px">
-      <el-card shadow="never">
-        <template #header>
-          <div class="h-3 flex justify-between">
-            <span>系统导航</span>
-          </div>
-        </template>
-        <el-skeleton :loading="loading" animated>
-          <el-row :gutter="8" class="gap-y-8px">
-            <el-col
-              v-for="(item, index) in navLinks"
-              :key="`nav-${index}`"
-              :xl="6"
-              :lg="6"
-              :md="8"
-              :sm="12"
-              :xs="12"
-              class="!flex"
-            >
-              <el-card
-                shadow="hover"
-                class="flex-1 cursor-pointer"
-                body-class="!p-14px"
-                @click="handleNavClick(item.url)"
-              >
-                <div class="flex items-center">
-                  <Icon
-                    :icon="item.icon"
-                    :size="22"
-                    class="mr-8px flex-none"
-                    :style="{ color: item.color }"
-                  />
-                  <span class="min-w-0 flex-1 truncate text-14px" :title="item.name">{{
-                    item.name
-                  }}</span>
-                </div>
-              </el-card>
-            </el-col>
-          </el-row>
-        </el-skeleton>
-      </el-card>
-    </el-col>
-    <el-col :xl="8" :lg="8" :md="24" :sm="24" :xs="24" class="mb-8px">
-      <el-card shadow="never">
-        <template #header>
-          <div class="h-3 flex justify-between">
-            <span>{{ t('workplace.notice') }}</span>
-            <el-link type="primary" :underline="false" @click="goNoticePage">{{
-              t('action.more')
-            }}</el-link>
-          </div>
-        </template>
-        <el-skeleton :loading="loading" animated>
-          <div v-for="(item, index) in notice" :key="`dynamics-${index}`">
-            <div class="flex items-center">
-              <el-avatar :src="avatar" :size="35" class="mr-16px">
-                <img src="@/assets/imgs/avatar.gif" alt="" />
-              </el-avatar>
-              <div class="min-w-0 flex-1">
-                <div class="text-14px">
-                  <el-tag size="small" class="mr-6px">{{ typeLabel(item.type) }}</el-tag>
-                  <span class="align-middle">{{ item.title }}</span>
-                </div>
-                <div class="mt-16px text-12px text-gray-400">
-                  {{ formatTime(item.createTime, 'yyyy-MM-dd') }}
-                </div>
-              </div>
-            </div>
-            <el-divider />
-          </div>
-        </el-skeleton>
-      </el-card>
-    </el-col>
-  </el-row>
-
-  <!-- ==================== IT 工具箱 ==================== -->
-  <el-card v-if="toolboxTools.length > 0" shadow="never" class="mt-8px">
-    <template #header>
-      <div class="h-3 flex justify-between">
-        <span>IT 工具箱</span>
-      </div>
-    </template>
-    <el-row :gutter="8" class="gap-y-8px">
-      <el-col
-        v-for="(item, index) in toolboxTools"
-        :key="`toolbox-${index}`"
-        :xl="6"
-        :lg="6"
-        :md="8"
-        :sm="12"
-        :xs="12"
-        class="!flex"
-      >
-        <el-card shadow="hover" class="flex-1" body-class="!p-12px">
-          <!-- 第一行：图标 + 名称 + 说明按钮 -->
-          <div class="flex items-center gap-x-6px">
-            <el-image
-              v-if="isToolIconUrl(item.icon)"
-              :src="item.icon"
-              class="h-18px w-18px flex-none"
-              fit="contain"
-            />
-            <Icon
-              v-else-if="item.icon"
-              :icon="item.icon"
-              :size="18"
-              class="flex-none"
-              :style="{ color: '#409EFF' }"
-            />
-            <span class="min-w-0 flex-1 truncate text-13px" :title="item.name">{{ item.name }}</span>
-            <el-popover :width="260" trigger="click">
-              <template #reference>
-                <el-button link type="primary" class="!p-0 !text-12px">
-                  <Icon icon="ep:info-filled" class="mr-2px" /> 说明
-                </el-button>
-              </template>
-              <div class="text-13px">
-                <div class="mb-8px text-14px font-bold">{{ item.name }}</div>
-                <div class="text-gray-500" style="white-space: pre-line">
-                  {{ item.description || '暂无说明' }}
-                </div>
-              </div>
-            </el-popover>
-          </div>
-          <!-- 第二行：分类/版本 + 下载（下载在版本后面） -->
-          <div
-            v-if="item.category || item.version"
-            class="mt-6px flex items-center justify-between gap-x-6px"
-          >
-            <div class="flex min-w-0 items-center">
-              <el-tag v-if="item.category" size="small">{{ item.category }}</el-tag>
-              <el-tag v-if="item.version" size="small" type="info" class="ml-6px">
-                {{ item.version }}
-              </el-tag>
-            </div>
-            <el-button size="small" type="primary" @click="handleToolDownload(item)">
-              <Icon icon="ep:download" class="mr-5px" /> 下载
-            </el-button>
-          </div>
-        </el-card>
-      </el-col>
-    </el-row>
-  </el-card>
 </template>
 <script lang="ts" setup>
-import { formatTime } from '@/utils'
-import { DICT_TYPE, getIntDictOptions } from '@/utils/dict'
-import { useRouter } from 'vue-router'
-
-import * as NoticeApi from '@/api/system/notice'
 import * as ToolboxToolApi from '@/api/infra/toolboxTool'
 import { useUserStore } from '@/store/modules/user'
-import type { WorkplaceTotal } from './types'
+import { usePermissionStore } from '@/store/modules/permission'
+import {
+  getHomeModules,
+  readHomeModulePaths,
+  saveHomeModulePaths,
+  type HomeModule
+} from '@/utils/homeModules'
 
 defineOptions({ name: 'Index' })
 
-const { t } = useI18n()
 const router = useRouter()
 const userStore = useUserStore()
-const loading = ref(true)
-const avatar = userStore.getUser.avatar
-const username = userStore.getUser.nickname
-// 获取统计数
-let totalSate = reactive<WorkplaceTotal>({
-  project: 0,
-  access: 0,
-  todo: 0
-})
-
-const getCount = async () => {
-  const data = {
-    project: 40,
-    access: 2340,
-    todo: 10
-  }
-  totalSate = Object.assign(totalSate, data)
+const permissionStore = usePermissionStore()
+const moduleCatalog = computed(() => getHomeModules(permissionStore.getRouters))
+const recentPaths = ref<string[]>([])
+const favoritePaths = ref<string[]>([])
+const moduleToAdd = ref('')
+const availableModules = computed(() =>
+  moduleCatalog.value.filter((item) => !favoritePaths.value.includes(item.path))
+)
+const recentModules = computed(() =>
+  recentPaths.value
+    .map((path) => moduleCatalog.value.find((item) => item.path === path))
+    .filter((item): item is HomeModule => !!item)
+)
+const favoriteModules = computed(() =>
+  favoritePaths.value
+    .map((path) => moduleCatalog.value.find((item) => item.path === path))
+    .filter((item): item is HomeModule => !!item)
+)
+function loadModulePreferences() {
+  const userId = userStore.getUser.id
+  recentPaths.value = readHomeModulePaths('recent', userId)
+  favoritePaths.value = readHomeModulePaths('favorite', userId)
 }
+function isFavorite(path: string) {
+  return favoritePaths.value.includes(path)
+}
+function toggleFavorite(path: string) {
+  favoritePaths.value = isFavorite(path)
+    ? favoritePaths.value.filter((item) => item !== path)
+    : [...favoritePaths.value, path]
+  saveHomeModulePaths('favorite', userStore.getUser.id, favoritePaths.value)
+}
+function addFavorite(path: string) {
+  if (path && !isFavorite(path)) toggleFavorite(path)
+  moduleToAdd.value = ''
+}
+function openModule(path: string) {
+  router.push(path)
+}
+onActivated(loadModulePreferences)
+onMounted(loadModulePreferences)
 
 // ==================== 系统导航（Accurant Home 门户链接） ====================
 interface NavItem {
@@ -284,31 +262,13 @@ const handleNavClick = (url: string) => {
   window.open(url, '_blank')
 }
 
-// ==================== 通知公告（真实数据） ====================
-let notice = reactive<NoticeApi.NoticeVO[]>([])
-const typeLabel = (type: number) => {
-  const item = getIntDictOptions(DICT_TYPE.SYSTEM_NOTICE_TYPE).find((d) => d.value === type)
-  return item?.label ?? String(type ?? '')
-}
-
-const getNotice = async () => {
-  const data = await NoticeApi.getNoticePage({
-    pageNo: 1,
-    pageSize: 5,
-    status: 0
-  } as PageParam & { status: number })
-  notice = Object.assign(notice, data.list ?? [])
-}
-
-const goNoticePage = () => {
-  router.push('/system/notice')
-}
-
 // ==================== IT 工具箱 ====================
 const toolboxTools = ref<ToolboxToolApi.ToolboxToolVO[]>([])
 
 const isToolIconUrl = (icon: string) => {
-  return !!icon && (icon.startsWith('http://') || icon.startsWith('https://') || icon.startsWith('/'))
+  return (
+    !!icon && (icon.startsWith('http://') || icon.startsWith('https://') || icon.startsWith('/'))
+  )
 }
 
 const getToolboxTools = async () => {
@@ -326,10 +286,21 @@ const handleToolDownload = async (item: ToolboxToolApi.ToolboxToolVO) => {
   }
 }
 
-const getAllApi = async () => {
-  await Promise.all([getCount(), getNotice(), getToolboxTools()])
-  loading.value = false
-}
-
-getAllApi()
+onMounted(getToolboxTools)
 </script>
+
+<style scoped>
+.home-section { border: 1px solid var(--el-border-color-lighter); border-radius: 14px; box-shadow: 0 4px 20px rgb(30 55 90 / 4%); }
+.home-section > :deep(.el-card__header) { padding: 10px 16px; }
+.home-section > :deep(.el-card__body) { padding: 10px 16px 12px; }
+.home-empty { padding: 5px 0; color: var(--el-text-color-secondary); font-size: 13px; }
+.home-entry { width: 100%; min-height: 40px; padding: 7px 10px; border: 1px solid transparent; border-radius: 10px; background: var(--el-fill-color-light); transition: background .2s, border-color .2s, transform .2s; }
+.home-entry:hover { background: var(--el-color-primary-light-9); border-color: var(--el-color-primary-light-7); transform: translateY(-2px); }
+.home-entry button { border: 0; background: transparent; cursor: pointer; }
+button.home-section > :deep(.el-card__header) { padding: 10px 16px; }
+.home-section > :deep(.el-card__body) { padding: 10px 16px 12px; }
+.home-empty { padding: 5px 0; color: var(--el-text-color-secondary); font-size: 13px; }
+.home-entry { cursor: pointer; }
+.home-tool { border: 1px solid var(--el-border-color-lighter); border-radius: 10px; background: var(--el-fill-color-light); transition: border-color .2s, transform .2s; }
+.home-tool:hover { border-color: var(--el-color-primary-light-7); transform: translateY(-2px); }
+</style>

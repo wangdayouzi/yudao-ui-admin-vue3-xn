@@ -2,7 +2,6 @@
   <Dialog v-model="visible" title="知识库自定义属性" width="760px">
     <el-table :data="fields" class="mb-16px">
       <el-table-column prop="fieldName" label="名称" />
-      <el-table-column prop="fieldCode" label="编码" />
       <el-table-column prop="fieldType" label="类型" />
       <el-table-column label="必填" width="70"><template #default="{ row }">{{ row.required ? '是' : '否' }}</template></el-table-column>
       <el-table-column label="启用" width="70"><template #default="{ row }">{{ row.enabled ? '是' : '否' }}</template></el-table-column>
@@ -11,7 +10,6 @@
     <el-button @click="edit()">新增属性</el-button>
     <el-dialog v-model="editing" title="属性配置" width="520px" append-to-body>
       <el-form :model="form" label-width="90px">
-        <el-form-item label="编码"><el-input v-model="form.fieldCode" :disabled="Boolean(form.id)" placeholder="例如 source_no" /></el-form-item>
         <el-form-item label="名称"><el-input v-model="form.fieldName" /></el-form-item>
         <el-form-item label="类型"><el-select v-model="form.fieldType" :disabled="Boolean(form.id)" class="w-full">
           <el-option v-for="type in types" :key="type.value" :label="type.label" :value="type.value" />

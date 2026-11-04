@@ -15,7 +15,9 @@ export interface KnowledgeReviewRecordVO {
   reviewDate: string
   remark?: string
   reviewerId: number
+  reviewerName: string
 }
+
 export interface KnowledgeReviewDueVO {
   documentId: number
   title: string

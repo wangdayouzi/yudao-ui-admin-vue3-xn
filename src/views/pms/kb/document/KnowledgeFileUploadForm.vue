@@ -28,13 +28,13 @@
           @update:uploading="fileUploading = $event"
         />
       </el-form-item>
-      <el-form-item label="知识库显示名称" prop="title">
+      <el-form-item label="文档标题" prop="title">
         <el-input
           ref="nameInputRef"
           @keydown.enter="confirmKnowledgeName($event, submitForm)"
           v-model="formData.title"
           maxlength="255"
-          placeholder="用于知识库列表和搜索，可与上传文件名不同"
+          placeholder="用于列表和搜索，可与上传文件名不同"
         />
       </el-form-item>
       <el-alert
@@ -98,7 +98,7 @@ const attributeRef = ref<InstanceType<typeof KnowledgeAttributeFields>>()
 const formData = ref(getDefaultFormData()) // 表单数据
 const allowedFileTypes = [...PmsKnowledgeUploadFileTypes] // 允许上传的文件类型
 const formRules = reactive({
-  title: [{ required: true, whitespace: true, message: '请输入知识库显示名称', trigger: 'blur' }],
+  title: [{ required: true, whitespace: true, message: '请输入文档标题', trigger: 'blur' }],
   content: [{ required: true, message: '请上传文件', trigger: 'change' }]
 }) // 表单校验规则
 const emit = defineEmits(['success']) // 定义 success 事件，用于操作成功后的回调

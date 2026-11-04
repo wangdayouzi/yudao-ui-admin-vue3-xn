@@ -18,6 +18,16 @@
           v-model="queryParams.libraryId"
           class="!w-240px"
           placeholder="请选择知识库"
+          @change="queryParams.attributeKeyword = ''"
+        />
+      </el-form-item>
+      <el-form-item label="文档编号" prop="documentCode">
+        <el-input
+          v-model="queryParams.documentCode"
+          class="!w-240px"
+          clearable
+          placeholder="按文档编号查找"
+          @keyup.enter="handleQuery"
         />
       </el-form-item>
       <el-form-item label="创建人" prop="creatorUserId">
@@ -28,7 +38,28 @@
         />
       </el-form-item>
       <el-form-item label="属性值" prop="attributeKeyword">
-        <el-input v-model="queryParams.attributeKeyword" class="!w-240px" clearable placeholder="搜索文档属性值" @keyup.enter="handleQuery" />
+        <el-input
+          v-model="queryParams.attributeKeyword"
+          class="!w-240px"
+          clearable
+          :disabled="!queryParams.libraryId"
+          :placeholder="queryParams.libraryId ? '输入属性值，支持模糊搜索' : '请先选择知识库'"
+          @keyup.enter="handleQuery"
+        />
+      </el-form-item>
+      <el-form-item label="有效性" prop="reviewResult">
+        <el-select
+          v-model="queryParams.reviewResult"
+          class="!w-240px"
+          clearable
+          placeholder="全部审阅结论"
+        >
+          <el-option label="未审阅" value="unreviewed" />
+          <el-option label="有效" value="valid" />
+          <el-option label="待确认" value="pending" />
+          <el-option label="已替代" value="replaced" />
+          <el-option label="已作废" value="abolished" />
+        </el-select>
       </el-form-item>
       <el-form-item label="更新时间" prop="updateTime">
         <el-date-picker
@@ -60,7 +91,7 @@
       <el-table-column label="文档标题" min-width="280">
         <template #default="scope">
           <el-link type="primary" @click="openDocumentDetail(scope.row)">
-            <span v-dompurify-html="highlightSummary(scope.row.title)" />
+            <span v-dompurify-html="highlightSummary(scope.row.title)"></span>
           </el-link>
           <span
             v-if="scope.row.fileSize !== undefined && scope.row.fileSize !== null"
@@ -76,6 +107,14 @@
         </template>
       </el-table-column>
       <el-table-column label="知识库" min-width="180" prop="libraryName" />
+      <el-table-column label="文档编号" min-width="150" prop="documentCode" show-overflow-tooltip />
+      <el-table-column label="有效性审阅" width="120" align="center">
+        <template #default="{ row }">
+          <el-tag size="small" :type="reviewTagType(row.reviewResult)">{{
+            reviewResultName(row.reviewResult)
+          }}</el-tag>
+        </template>
+      </el-table-column>
       <el-table-column align="center" label="类型" width="130">
         <template #default="scope">
           <DictTag :type="DICT_TYPE.PMS_KNOWLEDGE_DOCUMENT_TYPE" :value="scope.row.type" />
@@ -171,7 +210,9 @@ const queryParams = reactive({
   pageNo: 1,
   pageSize: 10,
   keyword: String(route.query.keyword || ''),
+  documentCode: String(route.query.documentCode || ''),
   attributeKeyword: String(route.query.attributeKeyword || ''),
+  reviewResult: String(route.query.reviewResult || ''),
   libraryId: route.query.libraryId ? Number(route.query.libraryId) : undefined,
   creatorUserId: route.query.creatorUserId ? Number(route.query.creatorUserId) : undefined,
   updateTime: route.query.updateTime ? String(route.query.updateTime).split(',') : ([] as string[])
@@ -333,6 +374,26 @@ function highlightSummary(summary: string) {
     .join('')
 }
 
+function reviewResultName(result?: string) {
+  return (
+    (
+      {
+        valid: '有效',
+        pending: '待确认',
+        replaced: '已替代',
+        abolished: '已作废',
+        unreviewed: '未审阅'
+      } as Record<string, string>
+    )[result || 'unreviewed'] || '未审阅'
+  )
+}
+function reviewTagType(result?: string): 'success' | 'warning' | 'danger' | 'info' {
+  if (result === 'valid') return 'success'
+  if (result === 'pending') return 'warning'
+  if (result === 'abolished' || result === 'replaced') return 'danger'
+  return 'info'
+}
+
 /** 初始化 */
 onMounted(() => {
   getList()
@@ -342,7 +403,9 @@ watch(
   () => route.query,
   (query) => {
     queryParams.keyword = String(query.keyword || '')
+    queryParams.documentCode = String(query.documentCode || '')
     queryParams.attributeKeyword = String(query.attributeKeyword || '')
+    queryParams.reviewResult = String(query.reviewResult || '')
     queryParams.libraryId = query.libraryId ? Number(query.libraryId) : undefined
     queryParams.creatorUserId = query.creatorUserId ? Number(query.creatorUserId) : undefined
     queryParams.updateTime = query.updateTime ? String(query.updateTime).split(',') : []

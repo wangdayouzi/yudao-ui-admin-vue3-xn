@@ -90,9 +90,7 @@
         class="mb-20px grid grid-cols-[minmax(0,2fr)_minmax(240px,1fr)] gap-16px max-[800px]:grid-cols-1"
       >
         <div class="min-w-0">
-          <div class="mb-8px text-13px text-[var(--el-text-color-secondary)]">{{
-            formData.type === PmsKnowledgeDocumentType.FILE ? '知识库显示名称' : '文档标题'
-          }}</div>
+          <div class="mb-8px text-13px text-[var(--el-text-color-secondary)]">{{ '文档标题' }}</div>
           <el-form-item class="!mb-0" prop="title">
             <el-input
               v-model="formData.title"
@@ -158,7 +156,7 @@
             @update:uploading="fileUploading = $event"
           />
           <div class="mt-8px text-12px text-[var(--el-text-color-secondary)]">
-            上传文件名是本次选择的原始文件名；知识库显示名称可单独修改。保存后新文件成为当前版本，旧文件保留在历史版本。
+            上传文件名是本次选择的原始文件名；文档标题可单独修改。保存后新文件成为当前版本，旧文件保留在历史版本。
           </div>
         </div>
       </el-form-item>

@@ -10,6 +10,7 @@ import { useDictStoreWithOut } from '@/store/modules/dict'
 import { useUserStoreWithOut } from '@/store/modules/user'
 import { usePermissionStoreWithOut } from '@/store/modules/permission'
 import { parseRouteLocation } from '@/utils/routeParams'
+import { recordRecentModule } from '@/utils/homeModules'
 
 const { start, done } = useNProgress()
 
@@ -131,6 +132,10 @@ router.beforeEach(async (to, from) => {
 })
 
 router.afterEach((to) => {
+  const userStore = useUserStoreWithOut()
+  if (getAccessToken() && userStore.getUser.id) {
+    recordRecentModule(to.path, userStore.getUser.id, usePermissionStoreWithOut().getRouters)
+  }
   useTitle(to?.meta?.title as string)
   done() // 结束Progress
   loadDone()

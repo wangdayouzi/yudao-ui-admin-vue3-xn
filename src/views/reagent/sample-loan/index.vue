@@ -3,11 +3,15 @@
     <ContentWrap>
       <el-form :inline="true" :model="queryParams" @submit.prevent>
         <el-form-item label="BAS号">
-          <el-input
+          <el-autocomplete
             v-model="queryParams.basNo"
-            placeholder="请输入 BAS 号"
+            :fetch-suggestions="fetchBasSuggestions"
+            placeholder="输入 BAS 号模糊搜索"
             clearable
-            class="!w-200px"
+            class="!w-220px"
+            @select="handleQuery"
+            @change="handleQuery"
+            @clear="handleQuery"
             @keyup.enter="handleQuery"
           />
         </el-form-item>
@@ -32,13 +36,34 @@
           </el-select>
         </el-form-item>
         <el-form-item label="站点">
-          <el-select v-model="queryParams.site" placeholder="全部站点" clearable class="!w-130px" @change="onQuerySiteChange">
-            <el-option v-for="site in siteOptions" :key="site.value" :label="site.label" :value="site.value" />
+          <el-select
+            v-model="queryParams.site"
+            placeholder="全部站点"
+            clearable
+            class="!w-130px"
+            @change="onQuerySiteChange"
+          >
+            <el-option
+              v-for="site in siteOptions"
+              :key="site.value"
+              :label="site.label"
+              :value="site.value"
+            />
           </el-select>
         </el-form-item>
         <el-form-item label="楼层">
-          <el-select v-model="queryParams.location" placeholder="全部楼层" clearable class="!w-130px">
-            <el-option v-for="location in queryLocationOptions" :key="location.value" :label="location.label" :value="location.value" />
+          <el-select
+            v-model="queryParams.location"
+            placeholder="全部楼层"
+            clearable
+            class="!w-130px"
+          >
+            <el-option
+              v-for="location in queryLocationOptions"
+              :key="location.value"
+              :label="location.label"
+              :value="location.value"
+            />
           </el-select>
         </el-form-item>
         <el-form-item label="状态">
@@ -101,7 +126,8 @@
                   : row.status === STATUS_NO_RETURN
                     ? '无需归还'
                     : '已归还'
-              }}</el-tag></template
+              }}</el-tag
+            ></template
           ></el-table-column
         >
         <el-table-column label="领用时间" width="170"
@@ -165,9 +191,23 @@
         label-width="92px"
         @submit.prevent
       >
-        <el-form-item label="BAS号" prop="basNo"
-          ><el-input v-model="createForm.basNo" placeholder="请输入 BAS 号" maxlength="64"
-        /></el-form-item>
+        <el-form-item label="BAS号" prop="basNo">
+          <el-select
+            v-model="createForm.basNo"
+            filterable
+            remote
+            allow-create
+            default-first-option
+            clearable
+            class="!w-full"
+            placeholder="搜索项目号/BAS，也可输入后缀（如 22BAS0055-Blind）"
+            :remote-method="searchBasOptions"
+            :loading="basLoading"
+            @visible-change="onBasVisible"
+          >
+            <el-option v-for="v in basFormOptions" :key="v" :label="v" :value="v" />
+          </el-select>
+        </el-form-item>
         <el-form-item label="领用类型" prop="materialType">
           <el-radio-group v-model="createForm.materialType">
             <el-radio-button value="SAMPLE">样品</el-radio-button>
@@ -176,12 +216,19 @@
         </el-form-item>
         <el-form-item label="站点" prop="site">
           <el-radio-group v-model="createForm.site" @change="onFormSiteChange">
-            <el-radio-button v-for="site in siteOptions" :key="site.value" :value="site.value">{{ site.label }}</el-radio-button>
+            <el-radio-button v-for="site in siteOptions" :key="site.value" :value="site.value">{{
+              site.label
+            }}</el-radio-button>
           </el-radio-group>
         </el-form-item>
         <el-form-item label="楼层" prop="location">
           <el-radio-group v-model="createForm.location">
-            <el-radio-button v-for="location in formLocationOptions" :key="location.value" :value="location.value">{{ location.label }}</el-radio-button>
+            <el-radio-button
+              v-for="location in formLocationOptions"
+              :key="location.value"
+              :value="location.value"
+              >{{ location.label }}</el-radio-button
+            >
           </el-radio-group>
         </el-form-item>
         <el-form-item label="需求人" prop="requesterId"
@@ -226,9 +273,9 @@
       </el-form>
       <template #footer
         ><el-button @click="createDialogVisible = false">取消</el-button
-        ><el-button type="primary" :loading="submitLoading" @click="submitCreateForm"
-          >{{ editingId ? '确认修改' : '确认登记' }}</el-button
-        ></template
+        ><el-button type="primary" :loading="submitLoading" @click="submitCreateForm">{{
+          editingId ? '确认修改' : '确认登记'
+        }}</el-button></template
       >
     </el-dialog>
   </div>
@@ -236,6 +283,7 @@
 
 <script lang="ts" setup>
 import * as ReagentApi from '@/api/reagent'
+import * as BasicDataApi from '@/api/reagent/basicData'
 import * as UserApi from '@/api/system/user'
 import { formatDate } from '@/utils/formatTime'
 import router from '@/router'
@@ -263,13 +311,24 @@ const siteOptions = ref<ReagentApi.SampleLoanOption[]>([])
 const locationsBySite = ref<Record<string, ReagentApi.SampleLoanOption[]>>({})
 const loadLocations = async (site: string) => {
   if (!site || locationsBySite.value[site]) return
-  locationsBySite.value = { ...locationsBySite.value, [site]: await ReagentApi.getSampleLoanLocations(site) }
+  locationsBySite.value = {
+    ...locationsBySite.value,
+    [site]: await ReagentApi.getSampleLoanLocations(site)
+  }
 }
 const queryLocationOptions = computed(() => {
   if (queryParams.site) return locationsBySite.value[queryParams.site] || []
-  return [...new Map(Object.values(locationsBySite.value).flat().map((item) => [item.value, item])).values()]
+  return [
+    ...new Map(
+      Object.values(locationsBySite.value)
+        .flat()
+        .map((item) => [item.value, item])
+    ).values()
+  ]
 })
-const formLocationOptions = computed(() => createForm.site ? locationsBySite.value[createForm.site] || [] : [])
+const formLocationOptions = computed(() =>
+  createForm.site ? locationsBySite.value[createForm.site] || [] : []
+)
 const onQuerySiteChange = async (site?: string) => {
   queryParams.location = undefined
   if (site) await loadLocations(site)
@@ -299,6 +358,7 @@ const getList = async () => {
   }
 }
 const handleQuery = () => {
+  queryParams.basNo = (queryParams.basNo || '').trim()
   queryParams.pageNo = 1
   getList()
 }
@@ -329,11 +389,53 @@ const createForm = reactive({
   remark: ''
 })
 const createRules = {
-  basNo: [{ required: true, message: '请输入 BAS 号', trigger: 'blur' }],
+  basNo: [{ required: true, message: '请选择 BAS 号', trigger: 'change' }],
   materialType: [{ required: true, message: '请选择领用类型', trigger: 'change' }],
   site: [{ required: true, message: '请选择站点', trigger: 'change' }],
   location: [{ required: true, message: '请选择地点', trigger: 'change' }],
   requesterId: [{ required: true, message: '请选择需求人', trigger: 'change' }]
+}
+
+// ==================== BAS 下拉（来源：老样本系统 reagent_item.base_id） ====================
+const basOptions = ref<string[]>([])
+const basLoading = ref(false)
+let basSearchSeq = 0
+const searchBasOptions = async (keyword = '') => {
+  const seq = ++basSearchSeq
+  basLoading.value = true
+  try {
+    const list = await BasicDataApi.getItemOptions({ keyword: keyword || undefined })
+    if (seq === basSearchSeq) basOptions.value = list.map((item) => item.baseId).filter(Boolean)
+  } catch {
+    // 加载失败保留手输能力
+  } finally {
+    if (seq === basSearchSeq) basLoading.value = false
+  }
+}
+const onBasVisible = (visible: boolean) => {
+  if (visible) searchBasOptions('')
+}
+const basFormOptions = computed(() => {
+  const list = basOptions.value.slice()
+  if (createForm.basNo && !list.includes(createForm.basNo)) list.unshift(createForm.basNo)
+  return [...new Set(list)]
+})
+/** 列表搜索：模糊提示，同时允许按输入值直接查询 */
+const fetchBasSuggestions = async (
+  queryString: string,
+  cb: (items: Array<{ value: string }>) => void
+) => {
+  try {
+    const list = await BasicDataApi.getItemOptions({ keyword: queryString || undefined })
+    const values = list.map((item) => item.baseId).filter(Boolean)
+    const keyword = (queryString || '').trim()
+    if (keyword && values.length === 0) {
+      values.unshift(keyword)
+    }
+    cb(values.map((value) => ({ value })))
+  } catch {
+    cb(queryString ? [{ value: queryString }] : [])
+  }
 }
 const getMaterialTypeLabel = (materialType?: ReagentApi.SampleLoanVO['materialType']) =>
   materialType === 'REAGENT' ? '试剂' : materialType === 'SAMPLE' ? '样品' : '-'
@@ -343,9 +445,10 @@ const getUserDisplayName = (user?: { nickname?: string; username?: string }) =>
   user?.nickname || user?.username || ''
 const getUserOptionLabel = (user: RequesterOption) => {
   const displayName = getUserDisplayName(user)
-  const name = user.username && user.username !== displayName
-    ? `${displayName}（${user.username}）`
-    : displayName
+  const name =
+    user.username && user.username !== displayName
+      ? `${displayName}（${user.username}）`
+      : displayName
   return user.status === 1 ? `${name}（已禁用）` : name
 }
 const searchUsers = async (keyword: string) => {
