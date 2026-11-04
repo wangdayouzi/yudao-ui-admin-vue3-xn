@@ -1,4 +1,5 @@
 import type { Component } from 'vue'
+import { defineAsyncComponent } from 'vue'
 import {
   ElCascader,
   ElCheckboxGroup,
@@ -15,14 +16,16 @@ import {
   ElSwitch,
   ElTimePicker,
   ElTimeSelect,
-  ElTransfer,
   ElAutocomplete,
   ElDivider
 } from 'element-plus'
 import { InputPassword } from '@/components/InputPassword'
-import { Editor } from '@/components/Editor'
 import { UploadImg, UploadImgs, UploadFile } from '@/components/UploadFile'
 import { ComponentName } from '@/types/components'
+import FormTransfer from './components/FormTransfer.vue'
+
+// 富文本编辑器按需加载，避免使用 Form 的页面因此加载 wangEditor
+const Editor = defineAsyncComponent(() => import('@/components/Editor/src/Editor.vue'))
 
 const componentMap: Recordable<Component, ComponentName> = {
   Radio: ElRadioGroup,
@@ -39,7 +42,7 @@ const componentMap: Recordable<Component, ComponentName> = {
   DatePicker: ElDatePicker,
   Rate: ElRate,
   ColorPicker: ElColorPicker,
-  Transfer: ElTransfer,
+  Transfer: FormTransfer,
   Divider: ElDivider,
   TimeSelect: ElTimeSelect,
   SelectV2: ElSelectV2,

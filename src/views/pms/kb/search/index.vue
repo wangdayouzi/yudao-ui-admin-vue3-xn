@@ -185,6 +185,8 @@
 </template>
 
 <script lang="ts" setup>
+import { parseId } from '@/utils/id'
+
 import * as KnowledgeDocumentApi from '@/api/pms/kb/content/document'
 import * as KnowledgeLibraryApi from '@/api/pms/kb/library'
 import * as KnowledgeFolderApi from '@/api/pms/kb/content/folder'
@@ -213,8 +215,8 @@ const queryParams = reactive({
   documentCode: String(route.query.documentCode || ''),
   attributeKeyword: String(route.query.attributeKeyword || ''),
   reviewResult: String(route.query.reviewResult || ''),
-  libraryId: route.query.libraryId ? Number(route.query.libraryId) : undefined,
-  creatorUserId: route.query.creatorUserId ? Number(route.query.creatorUserId) : undefined,
+  libraryId: route.query.libraryId ? parseId(route.query.libraryId) : undefined,
+  creatorUserId: route.query.creatorUserId ? parseId(route.query.creatorUserId) : undefined,
   updateTime: route.query.updateTime ? String(route.query.updateTime).split(',') : ([] as string[])
 }) // 查询参数
 const queryFormRef = ref() // 查询表单 Ref
@@ -406,8 +408,8 @@ watch(
     queryParams.documentCode = String(query.documentCode || '')
     queryParams.attributeKeyword = String(query.attributeKeyword || '')
     queryParams.reviewResult = String(query.reviewResult || '')
-    queryParams.libraryId = query.libraryId ? Number(query.libraryId) : undefined
-    queryParams.creatorUserId = query.creatorUserId ? Number(query.creatorUserId) : undefined
+    queryParams.libraryId = query.libraryId ? parseId(query.libraryId) : undefined
+    queryParams.creatorUserId = query.creatorUserId ? parseId(query.creatorUserId) : undefined
     queryParams.updateTime = query.updateTime ? String(query.updateTime).split(',') : []
     queryParams.pageNo = 1
     getList()

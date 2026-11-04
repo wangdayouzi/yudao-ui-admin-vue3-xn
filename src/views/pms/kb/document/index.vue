@@ -138,6 +138,8 @@
 </template>
 
 <script lang="ts" setup>
+import { isPositiveId, parseId } from '@/utils/id'
+
 import * as KnowledgeDocumentApi from '@/api/pms/kb/content/document'
 import KnowledgeArchiveDialog from './KnowledgeArchiveDialog.vue'
 import KnowledgeAttributeConfigDialog from './KnowledgeAttributeConfigDialog.vue'
@@ -177,7 +179,7 @@ const route = useRoute() // 当前路由
 const router = useRouter() // 路由
 const tagsViewStore = useTagsViewStore()
 const message = useMessage() // 消息弹窗
-const libraryId = computed(() => Number(route.params.libraryId)) // 知识库编号
+const libraryId = computed(() => parseId(route.params.libraryId) as number) // 知识库编号
 const loading = ref(false) // 页面加载中
 const activeView = ref<KnowledgeContentView>('home') // 当前右侧内容
 const librarySearchKeyword = ref('')
@@ -292,8 +294,8 @@ async function getRouteContent() {
   // 切换知识库时，由页面数据查询统一加载内容
   if (library.value?.id !== libraryId.value) return
   // 打开指定文档
-  const documentId = Number(route.params.documentId)
-  if (Number.isFinite(documentId) && documentId > 0) {
+  const documentId = parseId(route.params.documentId)
+  if (documentId !== undefined && isPositiveId(documentId)) {
     const document = await KnowledgeDocumentApi.getKnowledgeDocument(documentId, true)
     if (request !== contentRequest) return
     selectedDocument.value = document
@@ -310,8 +312,8 @@ async function getRouteContent() {
     return
   }
   // 打开指定文件夹
-  const folderId = Number(route.params.folderId)
-  if (Number.isFinite(folderId) && folderId > 0) {
+  const folderId = parseId(route.params.folderId)
+  if (folderId !== undefined && isPositiveId(folderId)) {
     const folder = await KnowledgeFolderApi.getKnowledgeFolder(folderId, true)
     if (request !== contentRequest) return
     selectedFolder.value = folder

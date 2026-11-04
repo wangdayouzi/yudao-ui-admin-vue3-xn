@@ -8,8 +8,12 @@ import { ElMessage } from 'element-plus'
 import { useLocaleStore } from '@/store/modules/locale'
 import { useUpload } from '@/components/UploadFile/src/useUpload'
 import merge from 'lodash-es/merge'
+import { setupWangEditorPlugin } from '@/views/bpm/model/form/PrintTemplate'
 
 defineOptions({ name: 'Editor' })
+
+// wangEditor 插件注册：需在创建编辑器之前完成
+setupWangEditorPlugin()
 
 type InsertFnType = (url: string, alt: string, href: string) => void
 
@@ -206,12 +210,12 @@ defineExpose({
 </script>
 
 <template>
-  <div class="w-full min-w-0 border-1 border-solid border-[var(--tags-view-border-color)] z-10">
+  <div class="w-full min-w-0 border-1 border-solid border-[var(--el-border-color)] z-10">
     <!-- 工具栏 -->
     <Toolbar
       :editor="editorRef"
       :editorId="editorId"
-      class="border-0 b-b-1 border-solid border-[var(--tags-view-border-color)]"
+      class="border-0 b-b-1 border-solid border-[var(--el-border-color)]"
     />
     <!-- 编辑器 -->
     <Editor

@@ -1,6 +1,7 @@
 <script lang="ts" setup>
 import { PropType } from 'vue'
 import dayjs from 'dayjs'
+import { get } from 'lodash-es'
 import { useDesign } from '@/hooks/web/useDesign'
 import { propTypes } from '@/utils/propTypes'
 import { useAppStore } from '@/store/modules/app'
@@ -54,7 +55,23 @@ const getBindItemValue = (item: DescriptionsSchema) => {
       delete obj[key]
     }
   }
-  return obj
+  return { labelClassName: `${prefixCls}-label`, ...obj }
+}
+
+// 按 field 读取数据，支持 a.b / a[0].b 嵌套路径；存在同名字面量键时与原来一样直接取该键
+// field 为 '' 时也按普通键读取（与原 data[field] 一致）
+const getFieldValue = (field: string) => {
+  return get(props.data, field)
+}
+
+// 日期格式化：null 返回空串（原有约定）；嵌套路径缺失时也返回空串，避免 dayjs(undefined) 显示当前时间
+// 普通字段为 undefined 时保持原有行为
+const formatDate = (item: DescriptionsSchema) => {
+  const value = getFieldValue(item.field)
+  if (value === null) return ''
+  const isPathField = !Reflect.has(props.data || {}, item.field) && /[.[]/.test(item.field)
+  if (value === undefined && isPathField) return ''
+  return dayjs(value).format(item.dateFormat)
 }
 
 // 折叠
@@ -94,7 +111,7 @@ const toggleClick = () => {
     </div>
 
     <ElCollapseTransition>
-      <div v-show="show" :class="[`${prefixCls}-content`, 'p-10px']">
+      <div v-show="show" :class="[`${prefixCls}-content`, 'p-20px']">
         <ElDescriptions
           :column="props.columns"
           :direction="mobile ? 'vertical' : 'horizontal'"
@@ -123,15 +140,13 @@ const toggleClick = () => {
 
             <template #default>
               <slot v-if="item.dateFormat">
-                {{
-                  data[item.field] !== null ? dayjs(data[item.field]).format(item.dateFormat) : ''
-                }}
+                {{ formatDate(item) }}
               </slot>
               <slot v-else-if="item.dictType">
-                <DictTag :type="item.dictType" :value="data[item.field] + ''" />
+                <DictTag :type="item.dictType" :value="getFieldValue(item.field) + ''" />
               </slot>
               <slot v-else :name="item.field" :row="data">
-                {{ item.mappedField ? data[item.mappedField] : data[item.field] }}
+                {{ getFieldValue(item.mappedField || item.field) }}
               </slot>
             </template>
           </ElDescriptionsItem>
@@ -158,9 +173,9 @@ $prefix-cls: #{$namespace}-descriptions;
   }
 }
 
-.#{$prefix-cls}-content {
-  :deep(.#{$elNamespace}-descriptions__cell) {
-    width: 0;
+.#{$prefix-cls} {
+  :deep(.#{$prefix-cls}-label) {
+    width: 150px;
   }
 }
 </style>
