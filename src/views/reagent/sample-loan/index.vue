@@ -523,9 +523,6 @@ const submitCreateForm = async () => {
       site: createForm.site!,
       location: createForm.location!,
       requesterId: createForm.requesterId,
-      requester: createForm.requester,
-      submitterId: createForm.submitterId,
-      submitter: createForm.submitter,
       sampleInfo: createForm.sampleInfo.trim() || undefined,
       remark: createForm.remark.trim() || undefined
     }
@@ -550,7 +547,13 @@ const submitCreateForm = async () => {
       }
     }
     if (editingId.value) {
-      await ReagentApi.updateSampleLoan({ id: editingId.value, ...payload })
+      await ReagentApi.updateSampleLoan({
+        id: editingId.value,
+        ...payload,
+        requester: createForm.requester,
+        submitterId: createForm.submitterId,
+        submitter: createForm.submitter
+      })
       message.success('领用记录已修改')
     } else {
       await ReagentApi.createSampleLoan(payload)

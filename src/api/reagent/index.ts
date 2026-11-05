@@ -170,7 +170,9 @@ export type SampleLoanSaveVO = Pick<
   | 'remark'
 >
 
-export const createSampleLoan = (data: SampleLoanSaveVO) => {
+export const createSampleLoan = (
+  data: Omit<SampleLoanSaveVO, 'requester' | 'submitterId' | 'submitter'>
+) => {
   return request.post({ url: '/reagent/sample-loan/create', data })
 }
 
