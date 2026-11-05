@@ -1,5 +1,5 @@
 <template>
-  <div class="px-4px pb-16px pl-16px pt-8px text-14px">
+  <div class="px-4px pb-16px pt-8px text-14px">
     <!-- 主页入口 -->
     <div
       class="h-40px flex cursor-pointer items-center gap-6px rounded-[var(--el-border-radius-base)] px-8px hover:bg-[var(--el-fill-color-light)]"
@@ -62,15 +62,6 @@
         >
           <Icon :icon="getKnowledgeTreeNodeIcon(data)" class="shrink-0" />
           <span class="min-w-0 flex-1 truncate" :title="data.label">{{ data.label }}</span>
-          <el-button
-            class="knowledge-node-more !h-28px !w-28px shrink-0"
-            link
-            :aria-label="`${data.label}的操作`"
-            title="更多操作（也可右键）"
-            @click.stop="openMoreMenu($event, data)"
-          >
-            <Icon icon="ep:more-filled" />
-          </el-button>
         </div>
       </template>
     </el-tree>
@@ -179,10 +170,6 @@ function openContextMenu(event: MouseEvent, data: KnowledgeTreeNode) {
   event.stopPropagation()
   showNodeMenu(data, event.clientX, event.clientY)
 }
-function openMoreMenu(event: MouseEvent, data: KnowledgeTreeNode) {
-  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
-  showNodeMenu(data, rect.left, rect.bottom)
-}
 function handleContextCommand(command: string) {
   const node = contextNode.value
   contextMenuRef.value?.handleClose()
@@ -235,12 +222,10 @@ watch([() => props.currentNodeKey, () => props.treeData], () => {
 </script>
 
 <style lang="scss" scoped>
-.knowledge-node-more {
-  color: var(--el-text-color-secondary);
-}
 .knowledge-tree-row.is-context-target {
   color: var(--el-color-primary);
 }
+
 .knowledge-sidebar-tree {
   padding-right: 8px;
   background-color: transparent;

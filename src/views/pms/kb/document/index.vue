@@ -2,28 +2,47 @@
   <!-- 知识库工作区 -->
   <div
     v-loading="loading"
-    class="knowledge-library-workspace -mt-8px grid min-h-[calc(100vh-120px)] gap-8px max-[900px]:min-h-0"
-    :class="
-      sidebarVisible
-        ? 'grid-cols-[210px_minmax(0,1fr)] max-[900px]:grid-cols-1'
-        : 'grid-cols-[36px_minmax(0,1fr)]'
-    "
+    ref="workspaceRef"
+    class="knowledge-library-workspace -mt-8px grid min-h-[calc(100vh-120px)] max-[900px]:min-h-0"
+    :class="{ 'sidebar-collapsed': !sidebarVisible, 'is-resizing': resizingSidebar }"
+    :style="{ '--knowledge-sidebar-width': `${sidebarWidth}px` }"
   >
     <!-- 左侧导航与目录 -->
-    <ContentWrap v-if="sidebarVisible" :body-style="{ padding: '0' }" class="!mb-0">
-      <KnowledgeLibrarySidebar
-        :active-view="activeView"
-        :current-node-key="currentNodeKey"
-        :tree-data="treeData"
-        :write-status="Boolean(tree?.writeStatus)"
-        @collapse="toggleSidebar"
-        @create="handleCreateCommand"
-        @home="handleHome"
-        @node-click="handleNodeClick"
-        @node-action="handleNodeAction"
-        @recycle="handleRecycle"
-      />
-    </ContentWrap>
+    <div v-if="sidebarVisible" class="knowledge-library-sidebar">
+      <ContentWrap :body-style="{ padding: '0' }" class="!mb-0">
+        <KnowledgeLibrarySidebar
+          :active-view="activeView"
+          :current-node-key="currentNodeKey"
+          :tree-data="treeData"
+          :write-status="Boolean(tree?.writeStatus)"
+          @collapse="toggleSidebar"
+          @create="handleCreateCommand"
+          @home="handleHome"
+          @node-click="handleNodeClick"
+          @node-action="handleNodeAction"
+          @recycle="handleRecycle"
+        />
+      </ContentWrap>
+      <div
+        class="knowledge-sidebar-resizer"
+        role="separator"
+        tabindex="0"
+        aria-label="调整目录栏宽度"
+        aria-orientation="vertical"
+        :aria-valuenow="sidebarWidth"
+        :aria-valuemin="180"
+        :aria-valuemax="560"
+        title="拖动调整目录宽度，双击恢复默认"
+        @pointerdown="startSidebarResize"
+        @pointermove="resizeSidebar"
+        @pointerup="stopSidebarResize"
+        @pointercancel="stopSidebarResize"
+        @lostpointercapture="stopSidebarResize"
+        @dblclick="setSidebarWidth(240)"
+        @keydown.left.prevent="setSidebarWidth(sidebarWidth - 16)"
+        @keydown.right.prevent="setSidebarWidth(sidebarWidth + 16)"
+      ></div>
+    </div>
 
     <div v-else class="sticky top-8px flex h-40px justify-center pt-12px">
       <el-tooltip content="显示目录" placement="right">
@@ -34,7 +53,7 @@
     </div>
 
     <!-- 右侧业务内容 -->
-    <ContentWrap :body-style="{ padding: '16px 20px' }" class="knowledge-library-main !mb-0">
+    <ContentWrap :body-style="{ padding: '12px' }" class="knowledge-library-main !mb-0">
       <nav
         aria-label="知识库位置"
         class="mb-10px flex items-center gap-6px overflow-x-auto whitespace-nowrap text-12px text-[var(--el-text-color-secondary)]"
@@ -58,8 +77,17 @@
         <template v-if="activeView === 'recycle'"
           ><Icon icon="ep:arrow-right" class="text-10px" /><span>最近删除</span></template
         >
-        <el-input v-model="librarySearchKeyword" class="!ml-auto !w-220px shrink-0" clearable placeholder="在此知识库搜索" @keyup.enter="handleLibrarySearch">
-          <template #append><el-button aria-label="搜索" @click="handleLibrarySearch"><Icon icon="ep:search" /></el-button></template>
+        <el-input
+          v-model="librarySearchKeyword"
+          class="!ml-auto !w-220px shrink-0"
+          clearable
+          placeholder="在此知识库搜索"
+          @keyup.enter="handleLibrarySearch"
+        >
+          <template #append
+            ><el-button aria-label="搜索" @click="handleLibrarySearch"
+              ><Icon icon="ep:search" /></el-button
+          ></template>
         </el-input>
       </nav>
       <KnowledgeRecyclePanel
@@ -186,6 +214,36 @@ const librarySearchKeyword = ref('')
 const library = ref<KnowledgeLibraryApi.PmsKnowledgeLibraryVO>() // 知识库详情
 const savedSidebarState = localStorage.getItem('pms-kb-sidebar-visible')
 const sidebarVisible = ref(window.innerWidth > 900 && savedSidebarState !== 'false')
+const workspaceRef = ref<HTMLElement>()
+const savedSidebarWidth = Number(localStorage.getItem('pms-kb-sidebar-width'))
+const sidebarWidth = ref(
+  Number.isFinite(savedSidebarWidth) && savedSidebarWidth >= 180
+    ? Math.min(560, savedSidebarWidth)
+    : 240
+)
+const resizingSidebar = ref(false)
+let sidebarDragStartX = 0
+let sidebarDragStartWidth = 0
+function setSidebarWidth(width: number) {
+  const maxWidth = Math.max(180, Math.min(560, (workspaceRef.value?.clientWidth ?? 920) - 360))
+  sidebarWidth.value = Math.round(Math.max(180, Math.min(maxWidth, width)))
+  localStorage.setItem('pms-kb-sidebar-width', String(sidebarWidth.value))
+}
+function startSidebarResize(event: PointerEvent) {
+  if (event.button !== 0) return
+  event.preventDefault()
+  sidebarDragStartX = event.clientX
+  sidebarDragStartWidth = sidebarWidth.value
+  resizingSidebar.value = true
+  ;(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId)
+}
+function resizeSidebar(event: PointerEvent) {
+  if (resizingSidebar.value)
+    setSidebarWidth(sidebarDragStartWidth + event.clientX - sidebarDragStartX)
+}
+function stopSidebarResize() {
+  resizingSidebar.value = false
+}
 function toggleSidebar() {
   sidebarVisible.value = !sidebarVisible.value
   localStorage.setItem('pms-kb-sidebar-visible', String(sidebarVisible.value))
@@ -514,7 +572,13 @@ async function deleteDocument(document: KnowledgeDocumentApi.PmsKnowledgeDocumen
 
 /** 从知识库主页进入限定当前知识库的搜索 */
 function handleLibrarySearch() {
-  router.push({ path: '/pms/kb/search', query: { libraryId: String(libraryId.value), keyword: librarySearchKeyword.value.trim() || undefined } })
+  router.push({
+    path: '/pms/kb/search',
+    query: {
+      libraryId: String(libraryId.value),
+      keyword: librarySearchKeyword.value.trim() || undefined
+    }
+  })
 }
 
 /** 打开知识库主页 */
@@ -702,11 +766,61 @@ watch([() => route.params.folderId, () => route.params.documentId], () => {
 </script>
 
 <style lang="scss" scoped>
+.knowledge-library-workspace {
+  grid-template-columns: min(var(--knowledge-sidebar-width), 45%) minmax(0, 1fr);
+  gap: 4px;
+  margin-right: -8px;
+  margin-left: -8px;
+
+  &.sidebar-collapsed {
+    grid-template-columns: 28px minmax(0, 1fr);
+  }
+
+  &.is-resizing {
+    cursor: col-resize;
+    user-select: none;
+  }
+}
+
+.knowledge-library-sidebar {
+  position: relative;
+  min-width: 0;
+}
+
+.knowledge-sidebar-resizer {
+  position: absolute;
+  top: 0;
+  right: -4px;
+  z-index: 2;
+  width: 8px;
+  height: 100%;
+  cursor: col-resize;
+  touch-action: none;
+
+  &:hover,
+  &:focus-visible {
+    background: var(--el-color-primary-light-7);
+    outline: none;
+  }
+}
+
+.knowledge-library-main {
+  min-width: 0;
+}
+
 .knowledge-library-workspace :deep(.el-card) {
   height: 100%;
 }
 
 @media (width <= 900px) {
+  .knowledge-library-workspace:not(.sidebar-collapsed) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .knowledge-sidebar-resizer {
+    display: none;
+  }
+
   .knowledge-library-main :deep(.el-card__body) {
     padding-right: 12px !important;
     padding-left: 12px !important;

@@ -1,16 +1,25 @@
 import request from '@/config/axios'
 
-export const exportKnowledgeArchive = (libraryId: number, documentIds: number[] = []) =>
+export const exportKnowledgeArchive = (
+  libraryId: number,
+  documentIds: number[] = [],
+  folderId?: number
+) =>
   request.download<Blob>({
     url: '/pms/kb/archive/export',
-    params: { libraryId, documentIds: documentIds.length ? documentIds.join(',') : undefined },
+    params: {
+      libraryId,
+      folderId,
+      documentIds: documentIds.length ? documentIds.join(',') : undefined
+    },
     timeout: 180000
   })
 
-export const restoreKnowledgeArchive = (libraryId: number, file: File) => {
+export const restoreKnowledgeArchive = (libraryId: number, file: File, folderId = 0) => {
   const data = new FormData()
   data.append('libraryId', String(libraryId))
   data.append('file', file)
+  data.append('folderId', String(folderId))
   return request.post<number>({
     url: '/pms/kb/archive/restore',
     data,
@@ -19,12 +28,15 @@ export const restoreKnowledgeArchive = (libraryId: number, file: File) => {
   })
 }
 
-export const batchImportKnowledgeFiles = (libraryId: number, files: File[]) => {
+export const batchImportKnowledgeFiles = (libraryId: number, files: File[], folderId = 0) => {
   const data = new FormData()
   data.append('libraryId', String(libraryId))
-  data.append('folderId', '0')
+  data.append('folderId', String(folderId))
   data.append('parentId', '0')
   files.forEach((file) => data.append('files', file))
+  if (files.some((file) => file.webkitRelativePath)) {
+    files.forEach((file) => data.append('paths', file.webkitRelativePath || file.name))
+  }
   return request.post<number[]>({
     url: '/pms/kb/archive/batch-import',
     data,
