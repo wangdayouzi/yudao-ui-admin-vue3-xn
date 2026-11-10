@@ -254,6 +254,24 @@
         <el-form-item label="提单人"
           ><el-input v-model="createForm.submitter" readonly
         /></el-form-item>
+        <el-form-item v-if="editingId" label="领用时间">
+          <el-date-picker
+            v-model="createForm.createTime"
+            type="datetime"
+            value-format="YYYY-MM-DD HH:mm:ss"
+            :clearable="false"
+            placeholder="选择领用时间"
+          />
+        </el-form-item>
+        <el-form-item v-if="editingId && editingStatus === 2" label="归还时间">
+          <el-date-picker
+            v-model="createForm.returnTime"
+            type="datetime"
+            value-format="YYYY-MM-DD HH:mm:ss"
+            :clearable="false"
+            placeholder="选择归还时间"
+          />
+        </el-form-item>
         <el-form-item label="物料信息"
           ><el-input
             v-model="createForm.sampleInfo"
@@ -375,6 +393,9 @@ const createDialogVisible = ref(false)
 const submitLoading = ref(false)
 const createFormRef = ref()
 const editingId = ref<number>()
+const editingStatus = ref<number>()
+let originalCreateTime = ''
+let originalReturnTime = ''
 const dialogTitle = computed(() => (editingId.value ? '修改领用' : '新增领用'))
 const createForm = reactive({
   basNo: '',
@@ -385,6 +406,8 @@ const createForm = reactive({
   requester: '',
   submitterId: undefined as number | undefined,
   submitter: '',
+  createTime: '',
+  returnTime: '',
   sampleInfo: '',
   remark: ''
 })
@@ -479,6 +502,7 @@ const handleRequesterChange = (requesterId?: number) => {
 const openCreateDialog = () => {
   const currentUser = useUserStoreWithOut().getUser
   editingId.value = undefined
+  editingStatus.value = undefined
   Object.assign(createForm, {
     basNo: '',
     materialType: undefined,
@@ -486,6 +510,8 @@ const openCreateDialog = () => {
     location: undefined,
     requesterId: undefined,
     requester: '',
+    createTime: '',
+    returnTime: '',
     submitterId: currentUser?.id,
     submitter: getUserDisplayName(currentUser),
     sampleInfo: '',
@@ -496,11 +522,16 @@ const openCreateDialog = () => {
 const openEditDialog = (row: ReagentApi.SampleLoanVO) => {
   void loadLocations(row.site || 'NINGBO')
   editingId.value = row.id
+  editingStatus.value = row.status
+  originalCreateTime = formatDate(row.createTime)
+  originalReturnTime = formatDate(row.returnTime)
   if (row.requesterId && !userOptions.value.some((user) => user.id === row.requesterId)) {
     userOptions.value.push({ id: row.requesterId, nickname: row.requester })
   }
   Object.assign(createForm, {
     basNo: row.basNo,
+    createTime: originalCreateTime,
+    returnTime: originalReturnTime,
     materialType: row.materialType,
     site: row.site || 'NINGBO',
     location: row.location,
@@ -515,6 +546,15 @@ const openEditDialog = (row: ReagentApi.SampleLoanVO) => {
 }
 const submitCreateForm = async () => {
   await createFormRef.value.validate()
+  if (
+    editingId.value &&
+    editingStatus.value === 2 &&
+    createForm.returnTime &&
+    createForm.returnTime < createForm.createTime
+  ) {
+    message.warning('归还时间不能早于领用时间')
+    return
+  }
   submitLoading.value = true
   try {
     const payload = {
@@ -550,6 +590,12 @@ const submitCreateForm = async () => {
       await ReagentApi.updateSampleLoan({
         id: editingId.value,
         ...payload,
+        createTime:
+          createForm.createTime !== originalCreateTime ? createForm.createTime : undefined,
+        returnTime:
+          editingStatus.value === 2 && createForm.returnTime !== originalReturnTime
+            ? createForm.returnTime
+            : undefined,
         requester: createForm.requester,
         submitterId: createForm.submitterId,
         submitter: createForm.submitter

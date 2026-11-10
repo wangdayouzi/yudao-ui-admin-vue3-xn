@@ -176,7 +176,9 @@ export const createSampleLoan = (
   return request.post({ url: '/reagent/sample-loan/create', data })
 }
 
-export const updateSampleLoan = (data: SampleLoanSaveVO & Pick<SampleLoanVO, 'id'>) => {
+export const updateSampleLoan = (
+  data: SampleLoanSaveVO & Pick<SampleLoanVO, 'id' | 'createTime' | 'returnTime'>
+) => {
   return request.put({ url: '/reagent/sample-loan/update', data })
 }
 
