@@ -109,7 +109,7 @@
       <el-table-column label="操作" fixed="right" width="210"
         ><template #default="{ row }">
           <el-button link type="primary" @click="openDetail(row.id)">{{
-            canHandle && row.status < 4 && (!row.handlerId || row.handlerId === userId)
+            row.status < 4
               ? '处理'
               : '详情'
           }}</el-button>
@@ -964,13 +964,7 @@ const progressRules = computed<FormRules>(() => ({
     }
   ]
 }))
-const canProcess = computed(
-  () =>
-    detail.value &&
-    canHandle.value &&
-    detail.value.status < 4 &&
-    (!detail.value.handlerId || detail.value.handlerId === userId.value)
-)
+const canProcess = computed(() => detail.value && detail.value.status < 4)
 let detailToken = 0
 const openDetail = async (
   id: number,

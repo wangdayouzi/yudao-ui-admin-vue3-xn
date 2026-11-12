@@ -39,7 +39,11 @@
     <el-table v-loading="loading" :data="list">
       <el-table-column prop="id" label="编号" width="90" />
       <el-table-column prop="templateName" label="模板" min-width="160" show-overflow-tooltip />
-      <el-table-column prop="templateCode" label="模板编码" min-width="180" show-overflow-tooltip />
+      <el-table-column label="消息内容" min-width="280" show-overflow-tooltip>
+        <template #default="{ row }">
+          {{ row.content?.title || row.content?.content || row.content?.text || '—' }}
+        </template>
+      </el-table-column>
       <el-table-column prop="userName" label="接收人" width="120" />
       <el-table-column label="状态" width="140"
         ><template #default="scope"
@@ -51,9 +55,9 @@
       >
       <el-table-column prop="errorMessage" label="失败原因" min-width="240" show-overflow-tooltip />
       <el-table-column prop="createTime" label="创建时间" :formatter="dateFormatter" width="180" />
-      <el-table-column label="操作" width="90" fixed="right"
+      <el-table-column label="操作" width="110" fixed="right"
         ><template #default="scope"
-          ><el-button link type="primary" @click="detail(scope.row.id)">详情</el-button></template
+          ><el-button link type="primary" @click="detail(scope.row.id)">查看消息</el-button></template
         ></el-table-column
       >
     </el-table>

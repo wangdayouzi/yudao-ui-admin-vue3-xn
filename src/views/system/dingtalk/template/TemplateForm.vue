@@ -82,7 +82,6 @@
               v-for="user in receivers"
               :key="user.id"
               :value="user.id"
-              :disabled="!user.dingTalkBound"
               :label="`${formatReceiverLabel(user)}${user.dingTalkBound ? '' : ' · 未关联钉钉'}`"
             />
           </el-select>

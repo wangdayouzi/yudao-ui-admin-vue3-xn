@@ -34,12 +34,14 @@
     <el-table v-loading="loading" :data="list" row-key="id">
       <el-table-column prop="id" label="编号" width="90" />
       <el-table-column prop="businessId" label="业务编号" min-width="170" show-overflow-tooltip />
-      <el-table-column prop="templateCode" label="模板编码" min-width="190" show-overflow-tooltip />
+      <el-table-column label="通知事项" min-width="190" show-overflow-tooltip>
+        <template #default="{ row }">{{ row.params?.action || row.templateCode }}</template>
+      </el-table-column>
       <el-table-column prop="userName" label="接收人" width="120" />
       <el-table-column label="状态" width="130">
         <template #default="{ row }"
           ><el-tag :type="statusColor(row.status)">{{
-            Api.notificationStatus[row.status]
+            statusLabel(row)
           }}</el-tag></template
         >
       </el-table-column>
@@ -52,7 +54,7 @@
       <el-table-column prop="errorMessage" label="说明" min-width="220" show-overflow-tooltip />
       <el-table-column label="操作" width="180" fixed="right">
         <template #default="{ row }">
-          <el-button link type="primary" @click="detail(row.id)">详情</el-button>
+          <el-button link type="primary" @click="detail(row.id)">查看消息</el-button>
           <el-button
             v-if="row.status === 0"
             v-hasPermi="['system:dingtalk-notification:manage']"
@@ -62,7 +64,7 @@
             >取消</el-button
           >
           <el-button
-            v-if="row.status === 3 || row.status === 4"
+            v-if="row.userId > 0 && (row.status === 3 || row.status === 4 || row.status === 8)"
             v-hasPermi="['system:dingtalk-notification:manage']"
             link
             type="primary"
@@ -80,13 +82,23 @@
     />
   </ContentWrap>
   <el-drawer v-model="detailVisible" title="通知详情" size="min(760px, 95vw)">
+    <div v-if="selected" class="mb-16px">
+      <h3 class="mb-8px">{{ messagePreview ? '待发内容预览' : '发送内容' }}</h3>
+      <el-text v-if="messagePreview" type="info">按当前模板预览，实际发送内容以发送记录为准。</el-text>
+      <MessagePreview
+        v-if="selectedMessage"
+        :type="selectedMessage.messageType"
+        :content="selectedMessage.content"
+      />
+      <el-text v-else type="info">{{ previewError || '暂无发送内容记录' }}</el-text>
+    </div>
     <el-descriptions v-if="selected" :column="1" border>
       <el-descriptions-item label="业务编号">{{ selected.businessId || '—' }}</el-descriptions-item>
       <el-descriptions-item label="接收人">{{ selected.userName }}</el-descriptions-item>
       <el-descriptions-item label="模板编码">{{ selected.templateCode }}</el-descriptions-item>
       <el-descriptions-item label="请求标识">{{ selected.requestId }}</el-descriptions-item>
       <el-descriptions-item label="状态">{{
-        Api.notificationStatus[selected.status]
+        statusLabel(selected)
       }}</el-descriptions-item>
       <el-descriptions-item label="计划发送">{{
         formatDate(selected.sendAfter)
@@ -105,14 +117,22 @@
       <el-descriptions-item label="操作原因">{{
         selected.operationReason || '—'
       }}</el-descriptions-item>
-      <el-descriptions-item
-        v-for="(value, key) in selected.params"
-        :key="key"
-        :label="paramLabels[key] || key"
-      >
-        <div class="whitespace-pre-wrap break-words">{{ value }}</div>
-      </el-descriptions-item>
     </el-descriptions>
+    <template v-if="selected">
+      <el-collapse v-if="Object.keys(selected.params || {}).length" class="mt-16px">
+        <el-collapse-item title="模板参数">
+          <el-descriptions :column="1" border>
+            <el-descriptions-item
+              v-for="(value, key) in selected.params"
+              :key="key"
+              :label="paramLabels[key] || key"
+            >
+              <div class="whitespace-pre-wrap break-words">{{ value }}</div>
+            </el-descriptions-item>
+          </el-descriptions>
+        </el-collapse-item>
+      </el-collapse>
+    </template>
   </el-drawer>
   <el-dialog
     v-model="operationVisible"
@@ -165,6 +185,7 @@
 </template>
 <script setup lang="ts">
 import * as Api from '@/api/system/dingtalk'
+import MessagePreview from '../components/MessagePreview.vue'
 import { dateFormatter, formatDate } from '@/utils/formatTime'
 import type { FormInstance } from 'element-plus'
 
@@ -210,11 +231,20 @@ const reset = () => {
   load()
 }
 const statusColor = (status: number): 'success' | 'warning' | 'danger' | 'info' =>
-  status === 2 ? 'success' : status === 3 ? 'warning' : status === 4 ? 'danger' : 'info'
+  status === 2 ? 'success' : [3, 7, 8].includes(status) ? 'warning' : status === 4 ? 'danger' : 'info'
 const detailVisible = ref(false)
 const selected = ref<Api.Notification>()
+const statusLabel = (row: Api.Notification) =>
+  Api.notificationStatus[row.status]
+const messagePreview = ref(false)
+const previewError = ref('')
+const selectedMessage = ref<Pick<Api.MessageLog, 'messageType' | 'content'>>()
 const detail = async (id: number) => {
-  selected.value = await Api.getNotification(id)
+  const result = await Api.getNotificationDetail(id)
+  selected.value = result.notice
+  selectedMessage.value = result.message
+  messagePreview.value = result.preview
+  previewError.value = result.previewError || ''
   detailVisible.value = true
 }
 const paramLabels: Record<string, string> = {

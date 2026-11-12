@@ -126,6 +126,15 @@ export const getNotificationPage = (params: Record<string, unknown>) =>
   request.get({ url: `${noticeBase}/page`, params })
 export const getNotification = (id: number): Promise<Notification> =>
   request.get({ url: `${noticeBase}/get`, params: { id } })
+export const getNotificationDetail = (
+  id: number
+): Promise<{
+  notice: Notification
+  message?: Pick<MessageLog, 'messageType' | 'content'>
+  preview: boolean
+  previewError?: string
+}> =>
+  request.get({ url: `${noticeBase}/detail`, params: { id } })
 export const operateNotification = (
   action: 'cancel' | 'resend',
   data: { id: number; reason: string; confirmedNotReceived: boolean }
@@ -137,7 +146,9 @@ export const notificationStatus: Record<number, string> = {
   3: '结果未知',
   4: '发送失败',
   5: '已取消',
-  6: '已过期'
+  6: '已过期',
+  7: '无有效接收人',
+  8: '钉钉未配置'
 }
 
 export interface TemplateParameter {
