@@ -9,8 +9,10 @@ export interface UrgentSave {
   newProject: boolean
   basNos: string
   sampleScope: string
+  inboundSite?: 'SHANGHAI' | 'NINGBO'
   deadline: string
   expectedArrival?: string
+  sampleReceivedTime?: string
   plannedTestTime?: string
   appointmentUserIds: number[]
   noticeUserIds: number[]

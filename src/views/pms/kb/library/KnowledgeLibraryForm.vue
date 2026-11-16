@@ -150,7 +150,7 @@
             v-for="rule in numberRules"
             :key="rule.id"
             :value="rule.id!"
-            :label="`${rule.name}（${rule.prefix} + ${rule.digits} 位流水）`"
+            :label="formatKnowledgeNumberRuleLabel(rule)"
           />
         </el-select>
         <div class="text-12px text-[var(--el-text-color-secondary)]"
@@ -238,6 +238,7 @@
 
 <script lang="ts" setup>
 import { confirmKnowledgeName } from '@/views/pms/kb/utils/interaction'
+import { formatKnowledgeNumberRuleLabel } from '@/views/pms/kb/utils/format'
 import * as KnowledgeLibraryApi from '@/api/pms/kb/library'
 import { getEnabledNumberRules, type NumberRuleVO } from '@/api/infra/number-rule'
 import { getCurrentUserId } from '@/utils/auth'

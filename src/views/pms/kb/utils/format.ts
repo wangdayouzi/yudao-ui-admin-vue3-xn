@@ -1,6 +1,13 @@
+import type { NumberRuleVO } from '@/api/infra/number-rule'
 import { DICT_TYPE, getDictLabel } from '@/utils/dict'
 import { formatFileSize } from '@/utils/file'
 import { PmsKnowledgeDocumentStatus, PmsKnowledgeObjectType } from './constants'
+
+/** 格式化编号规则的选项标签 */
+export function formatKnowledgeNumberRuleLabel(rule: NumberRuleVO) {
+  const parts = [rule.prefix, rule.yearlyReset ? '年份' : '', `${rule.digits} 位流水`]
+  return `${rule.name}（${parts.filter(Boolean).join(' + ')}）`
+}
 
 /** 格式化知识对象类型名称 */
 export function getKnowledgeObjectTypeName(type: number) {

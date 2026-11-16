@@ -187,7 +187,9 @@ export const moveKnowledgeDocument = (data: PmsKnowledgeDocumentMoveReqVO) => {
 }
 
 // 查询知识库文档搜索分页
-export const getKnowledgeDocumentSearchPage = (params: PageParam) => {
+export const getKnowledgeDocumentSearchPage = (
+  params: PageParam & { attributeFilters?: { fieldCode: string; keyword: string }[] }
+) => {
   return request.get<PageResult<PmsKnowledgeDocumentVO[]>>({
     url: '/pms/kb/document/search-page',
     params

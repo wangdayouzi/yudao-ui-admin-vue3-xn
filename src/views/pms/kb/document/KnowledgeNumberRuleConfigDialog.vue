@@ -7,7 +7,12 @@
       <el-form label-width="115px" class="mb-16px">
         <el-form-item label="知识库默认规则">
           <el-select v-model="libraryRuleId" class="w-full" clearable placeholder="请选择规则" @clear="libraryRuleId = undefined">
-            <el-option v-for="rule in rules" :key="rule.id" :label="ruleLabel(rule)" :value="rule.id!" />
+            <el-option
+              v-for="rule in rules"
+              :key="rule.id"
+              :label="formatKnowledgeNumberRuleLabel(rule)"
+              :value="rule.id!"
+            />
           </el-select>
         </el-form-item>
         <div class="flex justify-end"><el-button type="primary" :loading="savingLibrary" @click="saveLibraryRule">保存默认规则</el-button></div>
@@ -18,7 +23,12 @@
         <el-table-column label="编号规则" min-width="260">
           <template #default="{ row }">
             <el-select v-model="row.numberRuleId" class="w-full" clearable placeholder="继承知识库默认规则" @clear="row.numberRuleId = undefined">
-              <el-option v-for="rule in rules" :key="rule.id" :label="ruleLabel(rule)" :value="rule.id!" />
+              <el-option
+                v-for="rule in rules"
+                :key="rule.id"
+                :label="formatKnowledgeNumberRuleLabel(rule)"
+                :value="rule.id!"
+              />
             </el-select>
           </template>
         </el-table-column>
@@ -35,6 +45,7 @@
 import * as KnowledgeLibraryApi from '@/api/pms/kb/library'
 import * as KnowledgeFolderApi from '@/api/pms/kb/content/folder'
 import { getEnabledNumberRules, type NumberRuleVO } from '@/api/infra/number-rule'
+import { formatKnowledgeNumberRuleLabel } from '@/views/pms/kb/utils/format'
 
 const message = useMessage()
 const visible = ref(false)
@@ -46,7 +57,6 @@ const libraryRuleId = ref<number>()
 const folders = ref<KnowledgeFolderApi.PmsKnowledgeFolderVO[]>([])
 const rules = ref<NumberRuleVO[]>([])
 const emit = defineEmits<{ (event: 'saved'): void }>()
-function ruleLabel(rule: NumberRuleVO) { return `${rule.name}（${rule.prefix || ''}${rule.yearlyReset ? '年份' : ''} + ${rule.digits} 位流水）` }
 async function open(libraryId: number) {
   visible.value = true
   loading.value = true

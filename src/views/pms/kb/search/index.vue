@@ -18,7 +18,7 @@
           v-model="queryParams.libraryId"
           class="!w-240px"
           placeholder="请选择知识库"
-          @change="queryParams.attributeKeyword = ''"
+          @change="handleLibraryChange"
         />
       </el-form-item>
       <el-form-item label="文档编号" prop="documentCode">
@@ -37,13 +37,18 @@
           placeholder="请选择创建人"
         />
       </el-form-item>
-      <el-form-item label="属性值" prop="attributeKeyword">
+      <el-form-item
+        v-for="field in searchAttributeFields"
+        :key="field.fieldCode"
+        :label="field.fieldName"
+        label-width="auto"
+      >
         <el-input
-          v-model="queryParams.attributeKeyword"
+          v-model="attributeKeywords[field.fieldCode]"
           class="!w-240px"
           clearable
-          :disabled="!queryParams.libraryId"
-          :placeholder="queryParams.libraryId ? '输入属性值，支持模糊搜索' : '请先选择知识库'"
+          :maxlength="2000"
+          :placeholder="`按${field.fieldName}查找`"
           @keyup.enter="handleQuery"
         />
       </el-form-item>
@@ -108,6 +113,16 @@
       </el-table-column>
       <el-table-column label="知识库" min-width="180" prop="libraryName" />
       <el-table-column label="文档编号" min-width="150" prop="documentCode" show-overflow-tooltip />
+      <el-table-column
+        v-for="field in searchAttributeFields"
+        :key="field.id"
+        :label="field.fieldName"
+        min-width="140"
+      >
+        <template #default="{ row }">
+          {{ formatSearchAttribute(row.attributes?.[field.fieldCode], field.fieldType) }}
+        </template>
+      </el-table-column>
       <el-table-column label="有效性审阅" width="120" align="center">
         <template #default="{ row }">
           <el-tag size="small" :type="reviewTagType(row.reviewResult)">{{
@@ -190,6 +205,7 @@ import { parseId } from '@/utils/id'
 import * as KnowledgeDocumentApi from '@/api/pms/kb/content/document'
 import * as KnowledgeLibraryApi from '@/api/pms/kb/library'
 import * as KnowledgeFolderApi from '@/api/pms/kb/content/folder'
+import { getKnowledgeAttributes, type KnowledgeAttributeVO } from '@/api/pms/kb/attribute'
 import KnowledgeDocumentCreateForm from '../document/KnowledgeDocumentCreateForm.vue'
 import KnowledgeFileUploadForm from '../document/KnowledgeFileUploadForm.vue'
 import { PmsKnowledgeRootId } from '@/views/pms/kb/utils/constants'
@@ -208,12 +224,15 @@ const router = useRouter() // 路由对象
 const loading = ref(true) // 列表加载中
 const total = ref(0) // 列表总数
 const list = ref<KnowledgeDocumentApi.PmsKnowledgeDocumentVO[]>([]) // 文档列表
+const searchAttributeFields = ref<KnowledgeAttributeVO[]>([])
+const attributeKeywords = ref<Record<string, string>>({})
+let resultLibraryId: number | undefined
+let searchRequestId = 0
 const queryParams = reactive({
   pageNo: 1,
   pageSize: 10,
   keyword: String(route.query.keyword || ''),
   documentCode: String(route.query.documentCode || ''),
-  attributeKeyword: String(route.query.attributeKeyword || ''),
   reviewResult: String(route.query.reviewResult || ''),
   libraryId: route.query.libraryId ? parseId(route.query.libraryId) : undefined,
   creatorUserId: route.query.creatorUserId ? parseId(route.query.creatorUserId) : undefined,
@@ -331,14 +350,53 @@ function handleCreated(documentId?: number) {
 
 /** 查询文档列表 */
 async function getList() {
+  const requestId = ++searchRequestId
+  const params = { ...queryParams }
+  if (params.libraryId !== resultLibraryId) {
+    list.value = []
+    total.value = 0
+    searchAttributeFields.value = []
+  }
+  const attributeFilters = searchAttributeFields.value
+    .map((field) => ({
+      fieldCode: field.fieldCode,
+      keyword: attributeKeywords.value[field.fieldCode]?.trim() || ''
+    }))
+    .filter((filter) => filter.keyword)
   loading.value = true
   try {
-    const data = await KnowledgeDocumentApi.getKnowledgeDocumentSearchPage(queryParams)
+    const [data, fields] = await Promise.all([
+      KnowledgeDocumentApi.getKnowledgeDocumentSearchPage({ ...params, attributeFilters }),
+      params.libraryId
+        ? getKnowledgeAttributes(params.libraryId)
+        : Promise.resolve<KnowledgeAttributeVO[]>([])
+    ])
+    if (requestId !== searchRequestId) return
     list.value = data.list
     total.value = data.total
+    resultLibraryId = params.libraryId
+    searchAttributeFields.value = fields.filter((field) => field.enabled)
   } finally {
-    loading.value = false
+    if (requestId === searchRequestId) loading.value = false
   }
+}
+
+function handleLibraryChange() {
+  attributeKeywords.value = {}
+  handleQuery()
+}
+
+function formatSearchAttribute(value: string | undefined, type: KnowledgeAttributeVO['fieldType']) {
+  if (!value) return '—'
+  if (type === 'multiselect') {
+    try {
+      const selected: unknown = JSON.parse(value)
+      if (Array.isArray(selected)) return selected.join('、') || '—'
+    } catch {
+      return value
+    }
+  }
+  return value
 }
 
 /** 搜索按钮操作 */
@@ -350,6 +408,7 @@ function handleQuery() {
 /** 重置按钮操作 */
 function resetQuery() {
   queryFormRef.value?.resetFields()
+  attributeKeywords.value = {}
   handleQuery()
 }
 
@@ -406,9 +465,9 @@ watch(
   (query) => {
     queryParams.keyword = String(query.keyword || '')
     queryParams.documentCode = String(query.documentCode || '')
-    queryParams.attributeKeyword = String(query.attributeKeyword || '')
     queryParams.reviewResult = String(query.reviewResult || '')
     queryParams.libraryId = query.libraryId ? parseId(query.libraryId) : undefined
+    attributeKeywords.value = {}
     queryParams.creatorUserId = query.creatorUserId ? parseId(query.creatorUserId) : undefined
     queryParams.updateTime = query.updateTime ? String(query.updateTime).split(',') : []
     queryParams.pageNo = 1

@@ -3,7 +3,6 @@
     <el-radio-group v-model="query.view" @change="search" class="mb-16px">
       <el-radio-button value="ALL">全部需求</el-radio-button>
       <el-radio-button value="MINE">我的预约</el-radio-button>
-      <el-radio-button v-if="canHandle" value="HANDLING">待我处理</el-radio-button>
       <el-radio-button value="TODAY">今日到期</el-radio-button>
     </el-radio-group>
     <el-form :inline="true" @submit.prevent="search">
@@ -23,6 +22,13 @@
           @keydown.enter="searchOnEnter"
           @clear="search"
       /></el-form-item>
+      <el-form-item label="入库地点">
+        <el-select v-model="query.inboundSite" class="!w-140px" @change="search">
+          <el-option label="全部" value="ALL" />
+          <el-option label="宁波" value="NINGBO" />
+          <el-option label="上海" value="SHANGHAI" />
+        </el-select>
+      </el-form-item>
       <el-form-item label="状态">
         <el-select v-model="query.status" clearable class="!w-140px" @change="search">
           <el-option v-for="(s, i) in statuses" :key="i" :label="s" :value="i" />
@@ -81,6 +87,9 @@
       />
       <el-table-column label="BAS号" prop="basNos" min-width="190" show-overflow-tooltip />
       <el-table-column label="检测项" prop="sampleScope" min-width="190" show-overflow-tooltip />
+      <el-table-column label="入库地点" width="100">
+        <template #default="{ row }">{{ siteName(row.inboundSite) }}</template>
+      </el-table-column>
       <el-table-column label="预约入库时间" width="185">
         <template #default="{ row }"
           ><div :class="overdue(row) ? 'text-red-500' : ''">{{ fmt(row.deadline) }}</div
@@ -177,12 +186,12 @@
         </el-select>
       </el-form-item>
       <el-form-item label="新项目">
-        <el-switch v-model="form.newProject" @change="formRef?.clearValidate('basNos')" />
+        <el-switch v-model="form.newProject" />
       </el-form-item>
       <el-form-item
         label="BAS号"
         prop="basNos"
-        :required="form.newProject"
+        required
         :rules="[{ validator: validateBas, trigger: ['change'] }]"
       >
         <el-select
@@ -215,6 +224,12 @@
         >
           <el-option v-for="item in detectionOptions" :key="item" :label="item" :value="item" />
         </el-select>
+      </el-form-item>
+      <el-form-item label="入库地点" prop="inboundSite">
+        <el-radio-group v-model="form.inboundSite">
+          <el-radio value="SHANGHAI">上海</el-radio>
+          <el-radio value="NINGBO">宁波</el-radio>
+        </el-radio-group>
       </el-form-item>
       <el-form-item label="预约入库时间" prop="deadline">
         <el-date-picker
@@ -255,6 +270,15 @@
         <el-text v-if="editingLegacyContacts" type="info" size="small"
           >原联系人：{{ editingLegacyContacts }}，请确认预约人</el-text
         >
+      </el-form-item>
+      <el-form-item label="样本接收时间">
+        <el-date-picker
+          v-model="form.sampleReceivedTime"
+          type="datetime"
+          value-format="YYYY-MM-DD HH:mm:ss"
+          placeholder="选择日期和时间"
+          clearable
+        />
       </el-form-item>
       <el-form-item label="备注"
         ><el-input v-model="form.remark" type="textarea" :rows="2" maxlength="4000"
@@ -312,6 +336,9 @@
               <el-descriptions-item label="检测项" :span="2">{{
                 detail.sampleScope
               }}</el-descriptions-item>
+              <el-descriptions-item label="入库地点">
+                {{ siteName(detail.inboundSite) }}
+              </el-descriptions-item>
               <el-descriptions-item label="预约入库时间">{{
                 fmt(detail.deadline)
               }}</el-descriptions-item>
@@ -324,6 +351,9 @@
               <el-descriptions-item label="预约人">{{
                 detail.appointmentUserIds?.length ? detail.contacts : '待确认'
               }}</el-descriptions-item>
+              <el-descriptions-item label="样本接收时间">
+                {{ fmt(detail.sampleReceivedTime) }}
+              </el-descriptions-item>
               <el-descriptions-item label="通知样品管理员" :span="2">{{
                 detail.noticeNames || '使用钉钉模板默认接收范围'
               }}</el-descriptions-item>
@@ -424,7 +454,6 @@
                 v-if="progress.status === 3"
                 label="实际入库时间"
                 prop="completedTime"
-                required
                 ><el-date-picker
                   v-model="progress.completedTime"
                   type="datetime"
@@ -530,6 +559,11 @@ const statusType = (s: number): 'info' | 'primary' | 'warning' | 'success' =>
 const fmt = (value?: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm') : '—')
 const now = ref(dayjs().valueOf())
 let timer: ReturnType<typeof setInterval> | undefined
+const siteName = (site: UrgentSave['inboundSite']) => {
+  if (site === 'SHANGHAI') return '上海'
+  if (site === 'NINGBO') return '宁波'
+  return '—'
+}
 const overdue = (row: UrgentRecord) => row.status < 3 && dayjs(row.deadline).valueOf() < now.value
 const rowClass = ({ row }: { row: UrgentRecord }) => (overdue(row) ? 'urgent-overdue' : '')
 const canEdit = (row: UrgentRecord) =>
@@ -570,6 +604,7 @@ const defaults = () => ({
   pageSize: 20,
   keyword: '',
   contacts: '',
+  inboundSite: 'ALL',
   status: undefined as number | undefined,
   view: 'ALL'
 })
@@ -656,6 +691,7 @@ const emptyForm = (): UrgentSave => ({
   newProject: false,
   basNos: '',
   sampleScope: '',
+  inboundSite: undefined,
   deadline: '',
   contacts: '',
   appointmentUserIds: [userId.value],
@@ -782,11 +818,12 @@ const detectionItems = computed({
 })
 const validateBas = (_rule: unknown, value: string, callback: (error?: Error) => void) => {
   const hasBas = (value || '').split(/[,，、;；\r\n]+/).some((part) => part.trim())
-  callback(form.value.newProject && !hasBas ? new Error('请填写 BAS 号') : undefined)
+  callback(!hasBas ? new Error('请填写 BAS 号') : undefined)
 }
 const rules: FormRules = {
   projectNo: [{ required: true, message: '请选择临床方案', trigger: 'change' }],
   sampleScope: [{ required: true, whitespace: true, message: '请填写检测项', trigger: 'blur' }],
+  inboundSite: [{ required: true, message: '请选择入库地点', trigger: 'change' }],
   deadline: [{ required: true, message: '请选择预约入库时间', trigger: 'change' }],
   appointmentUserIds: [
     { type: 'array', required: true, min: 1, message: '请选择预约人', trigger: 'change' }
@@ -839,7 +876,11 @@ const openEdit = async (id: number) => {
       appointmentUserIds: r.appointmentUserIds || [],
       noticeUserIds: r.noticeUserIds || [],
       noticeDeptIds: r.noticeDeptIds || [],
+      inboundSite: r.inboundSite ?? undefined,
       deadline: dayjs(r.deadline).format('YYYY-MM-DD HH:mm:ss'),
+      sampleReceivedTime: r.sampleReceivedTime
+        ? dayjs(r.sampleReceivedTime).format('YYYY-MM-DD HH:mm:ss')
+        : undefined,
       expectedArrival: r.expectedArrival
         ? dayjs(r.expectedArrival).format('YYYY-MM-DD HH:mm:ss')
         : undefined,
@@ -885,6 +926,7 @@ const save = async () => {
       contacts: form.value.contacts.trim(),
       sampleScope: form.value.sampleScope.trim(),
       reason: form.value.reason.trim(),
+      sampleReceivedTime: form.value.sampleReceivedTime || undefined,
       expectedArrival: form.value.expectedArrival || undefined,
       plannedTestTime: form.value.plannedTestTime || undefined
     })
@@ -954,8 +996,7 @@ const progressRules = computed<FormRules>(() => ({
     {
       validator: (_r, value, cb) => {
         if (progress.status !== 3) return cb()
-        if (!value) return cb(new Error('请选择实际入库时间'))
-        if (dayjs(value).isAfter(dayjs())) return cb(new Error('实际入库时间不能晚于当前时间'))
+        if (!value) return cb()
         if (detail.value && dayjs(value).isBefore(dayjs(detail.value.createTime)))
           return cb(new Error('实际入库时间不能早于提交时间'))
         cb()
@@ -992,12 +1033,12 @@ const openDetail = async (
     detail.value = r
     logs.value = history
     Object.assign(progress, {
-      status: r.status === 2 ? 2 : 1,
+      status: r.status === 3 ? 3 : r.status === 2 ? 2 : 1,
       exceptionType: r.exceptionType,
       exceptionNote: r.exceptionNote || '',
       completedScope: r.completedScope || '',
       remainingScope: r.remainingScope || '',
-      completedTime: '',
+      completedTime: r.completedTime ? dayjs(r.completedTime).format('YYYY-MM-DD HH:mm:ss') : '',
       content: ''
     })
     progressBaseline.value = JSON.stringify(progress)
@@ -1062,7 +1103,6 @@ const submitProgress = async () => {
     if (!(await progressRef.value?.validate().catch(() => false))) return
     if (progress.status === 3) {
       if (progress.exceptionType !== 'NONE') return message.warning('请先解决异常，再确认全部完成')
-      if (!progress.completedTime) return message.warning('请填写实际入库时间')
       await ElMessageBox.confirm('确认本次要求的全部样品范围均已完成入库？', '确认全部完成', {
         type: 'warning'
       })
@@ -1071,7 +1111,7 @@ const submitProgress = async () => {
       action: 'PROGRESS',
       ...progress,
       remainingScope: progress.status === 2 ? progress.remainingScope.trim() : '',
-      completedTime: progress.status === 3 ? progress.completedTime : undefined
+      completedTime: progress.status === 3 ? progress.completedTime || undefined : undefined
     })
   } catch {
     /* 取消确认保留输入 */
