@@ -43,7 +43,7 @@
             :prefix-icon="iconLock"
             show-password
             type="password"
-            @keyup.enter="getCode()"
+            @keyup.enter.stop="getCode()"
           />
         </el-form-item>
       </el-col>
@@ -206,8 +206,14 @@ const loginData = reactive({
   }
 })
 
+// 登录进行中的同步锁：Enter 与点击、验证码 success 重复回调只触发一次登录（参考上游 97e7660e2）；
+// 不复用 loginLoading，避免社交登录失败未复位 loginLoading 时阻塞账号登录
+let loginPending = false
 // 获取验证码
 const getCode = async () => {
+  if (loginPending) {
+    return
+  }
   // 情况一，未开启：则直接登录
   if (loginData.captchaEnable === 'false') {
     await handleLogin({})
@@ -301,6 +307,10 @@ const submitPasswordSetup = async () => {
 
 // 登录
 const handleLogin = async (params: any) => {
+  if (loginPending) {
+    return
+  }
+  loginPending = true
   loginLoading.value = true
   try {
     await getTenantId()
@@ -330,8 +340,11 @@ const handleLogin = async (params: any) => {
     }
     await completeLogin(res)
   } finally {
+    loginPending = false
     loginLoading.value = false
+    // 校验失败、接口无返回或异常时，尚未创建 loading 实例
     loading.value?.close()
+    loading.value = undefined
   }
 }
 

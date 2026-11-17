@@ -1,4 +1,15 @@
 export default {
+  layout: {
+    expandNavigation: '展开导航',
+    collapseNavigation: '收起导航',
+    switchLanguage: '切换语言',
+    toggleDarkMode: '切换暗黑模式',
+    enterFullscreen: '全屏',
+    exitFullscreen: '退出全屏',
+    menuSearch: '菜单搜索',
+    switchSize: '切换尺寸',
+    message: '站内信'
+  },
   common: {
     inputText: '请输入',
     selectText: '请选择',
@@ -23,6 +34,9 @@ export default {
     closeTheRightTab: '关闭右侧标签页',
     closeOther: '关闭其他标签页',
     closeAll: '关闭全部标签页',
+    scrollTagsLeft: '向左滚动标签页',
+    scrollTagsRight: '向右滚动标签页',
+    moreTabActions: '更多标签页操作',
     prevLabel: '上一步',
     nextLabel: '下一步',
     skipLabel: '跳过',
@@ -57,7 +71,10 @@ export default {
     copyError: '复制失败',
     lengthRange: '长度在 {min} 到 {max} 个字符',
     notSpace: '不能包含空格',
-    notSpecialCharacters: '不能包含特殊字符'
+    notSpecialCharacters: '不能包含特殊字符',
+    phone: '请输入正确的手机号码',
+    email: '请输入正确的邮箱',
+    maxlength: '长度不能超过 {max} 个字符'
   },
   lock: {
     lockScreen: '锁定屏幕',
@@ -446,7 +463,7 @@ export default {
       oldPwdMsg: '请输入旧密码',
       newPwdMsg: '请输入新密码',
       cfPwdMsg: '请输入确认密码',
-      pwdRules: '长度在 6 到 20 个字符',
+      pwdRules: '长度为 4 到 16 个字符',
       diffPwd: '两次输入密码不一致'
     }
   },
@@ -462,7 +479,8 @@ export default {
     btn_scale_y: '垂直翻转',
     btn_zoom_in: '放大',
     btn_zoom_out: '缩小',
-    preview: '预览'
+    preview: '预览',
+    imageTypeError: '请选择图片格式的文件'
   },
   'OAuth 2.0': 'OAuth 2.0' // 避免菜单名是 OAuth 2.0 时，一直 warn 报错
 }

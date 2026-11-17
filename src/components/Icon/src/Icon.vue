@@ -2,6 +2,7 @@
 import { propTypes } from '@/utils/propTypes'
 import { Icon as IconifyIcon } from '@iconify/vue'
 import { useDesign } from '@/hooks/web/useDesign'
+import { isIconAvailable, isOfflineIcon, warnUnavailableIcon } from '@/plugins/svgIcon'
 
 defineOptions({ name: 'Icon' })
 
@@ -22,10 +23,30 @@ const props = defineProps({
   hoverColor: propTypes.string
 })
 
+// 上游图标名前缀（如 vi-ep:close），解析时去掉一次，等同 ep:close
+const ICON_PREFIX = 'vi-'
+
 const isLocal = computed(() => props.icon?.startsWith('svg-icon:'))
 
+// 仅 vi- 开头且去掉后仍为 集合:图标 格式时才去前缀，其它名称原样使用
+const iconName = computed(() => {
+  const { icon } = props
+  if (typeof icon !== 'string' || !icon.startsWith(ICON_PREFIX)) return icon
+  const name = icon.slice(ICON_PREFIX.length)
+  return name.includes(':') ? name : icon
+})
+
 const symbolId = computed(() => {
-  return unref(isLocal) ? `#icon-${props.icon.split('svg-icon:')[1]}` : props.icon
+  return unref(isLocal) ? `#icon-${props.icon.split('svg-icon:')[1]}` : unref(iconName)
+})
+
+// 离线图标模式下未注册的图标（参考上游 49a1f54c9 在线 / 离线开关）：渲染同尺寸占位，不请求 Iconify API
+const isUnavailable = computed(
+  () => isOfflineIcon && !unref(isLocal) && !isIconAvailable(unref(symbolId))
+)
+
+watchEffect(() => {
+  if (unref(isUnavailable)) warnUnavailableIcon(unref(symbolId))
 })
 
 const getSvgClass = computed(() => {
@@ -47,6 +68,13 @@ const getHoverStyle = computed(() => {
     <svg v-if="isLocal" :class="getSvgClass">
       <use :xlink:href="symbolId" />
     </svg>
+
+    <span
+      v-else-if="isUnavailable"
+      :class="getSvgClass"
+      :style="{ display: 'inline-block', width: '1em', height: '1em', fontSize: `${size}px` }"
+      aria-hidden="true"
+    ></span>
 
     <IconifyIcon
       v-else
