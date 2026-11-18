@@ -30,7 +30,7 @@
             <Icon
               :icon="isFavorite(item.path) ? 'ep:star-filled' : 'ep:star'"
               :size="18"
-              :class="isFavorite(item.path) ? 'text-[var(--el-color-warning)]' : ''"
+              :style="{ color: isFavorite(item.path) ? '#f5b301' : undefined }"
             />
           </el-button>
         </div>
@@ -62,7 +62,7 @@
             <span class="truncate text-14px" :title="item.title">{{ item.title }}</span>
           </button>
           <el-button link title="取消常用" @click="toggleFavorite(item.path)"
-            ><Icon icon="ep:star-filled" :size="18" class="text-[var(--el-color-warning)]"
+            ><Icon icon="ep:star-filled" :size="18" style="color: #f5b301"
           /></el-button>
         </div>
       </div>
