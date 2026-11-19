@@ -70,9 +70,15 @@
   </ContentWrap>
   <ContentWrap>
     <div class="mb-16px flex justify-between items-center">
-      <el-button v-hasPermi="['reagent:sample-urgent:create']" type="primary" @click="openCreate"
-        ><Icon icon="ep:plus" class="mr-4px" />登记加急需求</el-button
-      >
+      <div class="flex flex-wrap gap-8px items-center">
+        <el-button v-hasPermi="['reagent:sample-urgent:create']" type="primary" @click="openCreate"
+          ><Icon icon="ep:plus" class="mr-4px" />登记加急需求</el-button
+        >
+        <el-button @click="plansVisible = true">周期计划</el-button>
+        <el-tag v-if="query.recurringPlanId" closable @close="clearPlanFilter">
+          周期计划 #{{ query.recurringPlanId }} 的单据
+        </el-tag>
+      </div>
       <div
         ><el-button :loading="loading" @click="getList">刷新</el-button
         ><el-button :loading="exporting" :disabled="loading || !total" @click="exportCsv"
@@ -95,7 +101,10 @@
         ></template
       >
       <el-table-column label="登记编号" width="110"
-        ><template #default="{ row }">{{ row.id }}</template></el-table-column
+        ><template #default="{ row }"
+          >{{ row.id }}
+          <el-tag v-if="row.recurringPlanId" size="small" class="ml-4px">周期</el-tag>
+        </template></el-table-column
       >
       <el-table-column
         label="临床方案编号"
@@ -164,16 +173,20 @@
     />
   </ContentWrap>
 
+  <UrgentPlanDialog v-model="plansVisible" @view-records="viewPlanRecords" @changed="getList" />
+
   <el-dialog
     v-model="editVisible"
     :title="form.id ? '修改加急需求' : '登记加急需求'"
     width="min(760px, 96vw)"
+    top="5vh"
     :close-on-click-modal="true"
     :before-close="beforeEditClose"
     destroy-on-close
   >
     <el-form
       ref="formRef"
+      class="urgent-edit-form"
       :model="form"
       :rules="rules"
       label-width="110px"
@@ -181,6 +194,60 @@
       scroll-to-error
       @submit.prevent="save"
     >
+      <el-form-item v-if="!form.id" label="预约方式">
+        <el-radio-group v-model="appointmentMode">
+          <el-radio-button value="ONCE">单次预约</el-radio-button>
+          <el-radio-button value="RECURRING">周期预约</el-radio-button>
+        </el-radio-group>
+      </el-form-item>
+      <template v-if="appointmentMode === 'RECURRING' && !form.id">
+        <el-alert
+          type="info"
+          :closable="false"
+          show-icon
+          class="mb-16px"
+          title="登记一次，每天独立处理"
+          description="每天生成当天的加急单，复用下方的方案、BAS号、检测项和预约人；每单独立完成、独立判断逾期。若每天 BAS 不同，请使用单次预约。"
+        />
+        <el-form-item label="持续日期" required>
+          <el-date-picker
+            v-model="cycle.dates"
+            type="daterange"
+            value-format="YYYY-MM-DD"
+            start-placeholder="开始日期"
+            end-placeholder="结束日期"
+            :disabled-date="disabledCycleDate"
+          />
+        </el-form-item>
+        <el-form-item label="重复日期" required>
+          <div>
+            <el-radio-group v-model="repeatMode" @change="changeRepeatMode" class="mb-8px">
+              <el-radio-button value="DAILY">每天</el-radio-button>
+              <el-radio-button value="WORKDAYS">周一至周五</el-radio-button>
+              <el-radio-button value="CUSTOM">指定星期</el-radio-button>
+            </el-radio-group>
+            <el-checkbox-group v-if="repeatMode === 'CUSTOM'" v-model="cycle.weekdays">
+              <el-checkbox
+                v-for="(label, index) in weekdayLabels"
+                :key="index"
+                :value="index + 1"
+                >{{ label }}</el-checkbox
+              >
+            </el-checkbox-group>
+          </div>
+        </el-form-item>
+        <el-form-item label="每天截止时间" required>
+          <el-time-picker
+            v-model="cycle.dailyTime"
+            value-format="HH:mm:ss"
+            format="HH:mm"
+            placeholder="当天几点前入库"
+          />
+        </el-form-item>
+        <el-form-item label="预约预览">
+          <el-text>{{ cyclePreview }}</el-text>
+        </el-form-item>
+      </template>
       <el-form-item label="临床方案" prop="projectNo">
         <el-select
           v-model="form.projectNo"
@@ -250,7 +317,11 @@
           <el-radio value="NINGBO">宁波</el-radio>
         </el-radio-group>
       </el-form-item>
-      <el-form-item label="预约入库时间" prop="deadline">
+      <el-form-item
+        v-if="appointmentMode === 'ONCE' || form.id"
+        label="预约入库时间"
+        prop="deadline"
+      >
         <el-date-picker
           v-model="form.deadline"
           type="datetime"
@@ -290,7 +361,7 @@
           >原联系人：{{ editingLegacyContacts }}，请确认预约人</el-text
         >
       </el-form-item>
-      <el-form-item label="样本接收时间">
+      <el-form-item v-if="appointmentMode === 'ONCE' || form.id" label="样本接收时间">
         <el-date-picker
           v-model="form.sampleReceivedTime"
           type="datetime"
@@ -314,7 +385,7 @@
       ><el-button :disabled="saving" @click="beforeEditClose(() => (editVisible = false))"
         >取消</el-button
       ><el-button type="primary" :loading="saving" @click="save">{{
-        form.id ? '保存修改' : '提交需求'
+        form.id ? '保存修改' : appointmentMode === 'RECURRING' ? '创建周期计划' : '提交需求'
       }}</el-button></template
     >
   </el-dialog>
@@ -545,6 +616,7 @@
 
 <script setup lang="ts">
 import dayjs from 'dayjs'
+import UrgentPlanDialog from './UrgentPlanDialog.vue'
 import { ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules, TableInstance } from 'element-plus'
 import * as Api from '@/api/reagent/sampleUrgent'
@@ -669,7 +741,8 @@ const defaults = () => ({
   view: 'ALL',
   deadline: [] as string[] | null,
   sortField: undefined as 'deadline' | 'createTime' | undefined,
-  sortOrder: undefined as 'asc' | 'desc' | undefined
+  sortOrder: undefined as 'asc' | 'desc' | undefined,
+  recurringPlanId: undefined as number | undefined
 })
 const tableRef = ref<TableInstance>()
 const query = reactive(defaults())
@@ -725,6 +798,50 @@ const reset = () => {
   tableRef.value?.clearSort()
   getList()
 }
+const plansVisible = ref(false)
+const viewPlanRecords = (id: number) => {
+  Object.assign(query, defaults(), { recurringPlanId: id })
+  tableRef.value?.clearSort()
+  search()
+}
+const clearPlanFilter = () => {
+  query.recurringPlanId = undefined
+  search()
+}
+const appointmentMode = ref<'ONCE' | 'RECURRING'>('ONCE')
+const repeatMode = ref('DAILY')
+const weekdayLabels = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+const cycleDefaults = () => ({
+  dates: [dayjs().format('YYYY-MM-DD'), dayjs().add(6, 'day').format('YYYY-MM-DD')] as
+    | string[]
+    | null,
+  weekdays: [1, 2, 3, 4, 5, 6, 7],
+  dailyTime: '17:30:00'
+})
+const cycle = reactive(cycleDefaults())
+const disabledCycleDate = (date: Date) => dayjs(date).isBefore(dayjs().startOf('day'))
+const changeRepeatMode = (value: string | number | boolean | undefined) => {
+  if (value === 'DAILY') cycle.weekdays = [1, 2, 3, 4, 5, 6, 7]
+  if (value === 'WORKDAYS') cycle.weekdays = [1, 2, 3, 4, 5]
+}
+const cycleDates = computed(() => {
+  if (cycle.dates?.length !== 2 || !cycle.weekdays.length) return []
+  const start = dayjs(cycle.dates[0])
+  const end = dayjs(cycle.dates[1])
+  if (!start.isValid() || !end.isValid() || end.diff(start, 'day') > 365) return []
+  const dates: string[] = []
+  for (let date = start; !date.isAfter(end); date = date.add(1, 'day')) {
+    if (cycle.weekdays.includes(date.day() === 0 ? 7 : date.day()))
+      dates.push(date.format('YYYY-MM-DD'))
+  }
+  return dates
+})
+const cyclePreview = computed(() =>
+  cycleDates.value.length && cycle.dailyTime
+    ? `共 ${cycleDates.value.length} 次；首次 ${cycleDates.value[0]} ${cycle.dailyTime.slice(0, 5)} 前入库，每天生成一单。`
+    : '请选择有效的日期、重复星期及截止时间（最长366天）'
+)
+const editSnapshot = () => JSON.stringify({ form: form.value, mode: appointmentMode.value, cycle })
 const editVisible = ref(false)
 const saving = ref(false)
 const formRef = ref<FormInstance>()
@@ -913,9 +1030,7 @@ const confirmDiscard = async (dirty: boolean) => {
     return false
   }
 }
-const editDirty = computed(
-  () => editVisible.value && JSON.stringify(form.value) !== formBaseline.value
-)
+const editDirty = computed(() => editVisible.value && editSnapshot() !== formBaseline.value)
 const beforeEditClose = async (done: () => void) => {
   if (!saving.value && (await confirmDiscard(editDirty.value))) done()
 }
@@ -924,10 +1039,13 @@ const openCreate = async () => {
   if (!(await confirmDiscard(detailDirty.value))) return
   editingLegacyContacts.value = ''
   form.value = emptyForm()
+  appointmentMode.value = 'ONCE'
+  repeatMode.value = 'DAILY'
+  Object.assign(cycle, cycleDefaults())
   lastClinicalNo.value = ''
   searchClinicalOptions('')
   searchItemOptions('')
-  formBaseline.value = JSON.stringify(form.value)
+  formBaseline.value = editSnapshot()
   if (detailVisible.value) {
     if (progressBaseline.value) Object.assign(progress, JSON.parse(progressBaseline.value))
     comment.value = ''
@@ -939,6 +1057,7 @@ const openEdit = async (id: number) => {
   if (detailVisible.value && !(await confirmDiscard(detailDirty.value))) return
   try {
     const r = await Api.getRecord(id)
+    appointmentMode.value = 'ONCE'
     if (!canEdit(r)) return message.warning('当前需求不可修改，请刷新列表')
     editingLegacyContacts.value = r.appointmentUserIds?.length ? '' : r.legacyContacts || r.contacts
     form.value = {
@@ -966,7 +1085,7 @@ const openEdit = async (id: number) => {
       if (clinical) form.value.clinicalId = clinical.id
     }
     await searchItemOptions('')
-    formBaseline.value = JSON.stringify(form.value)
+    formBaseline.value = editSnapshot()
     if (detailVisible.value && progressBaseline.value) {
       Object.assign(progress, JSON.parse(progressBaseline.value))
       comment.value = ''
@@ -980,6 +1099,14 @@ const save = async () => {
   if (saving.value) return
   saving.value = true
   try {
+    const recurring = appointmentMode.value === 'RECURRING' && !form.value.id
+    if (recurring) {
+      if (!cycle.dates || cycle.dates.length !== 2 || !cycle.dailyTime || !cycleDates.value.length)
+        return message.warning('请完整填写周期信息，且持续日期内至少有一次预约（最长366天）')
+      if (dayjs(cycle.dates[0]).isBefore(dayjs().startOf('day')))
+        return message.warning('周期开始日期不能早于今天')
+      form.value.deadline = `${cycleDates.value[0]} ${cycle.dailyTime}`
+    }
     if (!(await formRef.value?.validate().catch(() => false))) return
     const matchedClinical = clinicalOptions.value.find((c) => c.number === form.value.projectNo)
     if (matchedClinical) form.value.clinicalId = matchedClinical.id
@@ -990,7 +1117,7 @@ const save = async () => {
         { type: 'warning' }
       )
     }
-    await Api.saveRecord({
+    const payload = {
       ...form.value,
       projectNo: (form.value.projectNo || '').trim(),
       contacts: form.value.contacts.trim(),
@@ -999,9 +1126,24 @@ const save = async () => {
       sampleReceivedTime: form.value.sampleReceivedTime || undefined,
       expectedArrival: form.value.expectedArrival || undefined,
       plannedTestTime: form.value.plannedTestTime || undefined
-    })
-    message.success('已保存')
-    formBaseline.value = JSON.stringify(form.value)
+    }
+    if (recurring) {
+      await Api.createPlan({
+        template: {
+          ...payload,
+          sampleReceivedTime: undefined,
+          expectedArrival: undefined,
+          plannedTestTime: undefined,
+          logisticsNo: ''
+        },
+        startDate: cycle.dates![0],
+        endDate: cycle.dates![1],
+        dailyTime: cycle.dailyTime,
+        weekdays: cycle.weekdays
+      })
+    } else await Api.saveRecord(payload)
+    message.success(recurring ? '周期计划已创建；预约当天自动生成加急单' : '已保存')
+    formBaseline.value = editSnapshot()
     editVisible.value = false
     await getList()
     if (detailVisible.value && detail.value?.id === form.value.id)
@@ -1311,6 +1453,12 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.urgent-edit-form {
+  max-height: calc(100vh - 220px);
+  padding-right: 8px;
+  overflow-y: auto;
+}
+
 .urgent-search-top,
 .urgent-search-fields {
   display: flex;

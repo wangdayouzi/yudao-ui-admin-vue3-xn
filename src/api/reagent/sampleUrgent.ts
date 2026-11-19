@@ -24,6 +24,8 @@ export interface UrgentSave {
   changeReason?: string
 }
 export interface UrgentRecord extends UrgentSave {
+  recurringPlanId?: number
+  recurringDate?: string
   legacyContacts?: string
   noticeNames?: string
   urgentNo: string
@@ -93,3 +95,66 @@ export interface UrgentOptions {
 }
 export const getSelectionOptions = (): Promise<UrgentOptions> =>
   request.get({ url: `${url}/selection-options` })
+
+export interface UrgentPlanSave {
+  template: UrgentSave
+  startDate: string
+  endDate: string
+  dailyTime: string
+  weekdays: number[]
+}
+export interface UrgentPlan extends UrgentPlanSave {
+  id: number
+  revision: number
+  requesterId: number
+  requesterName: string
+  status: number
+  nextDate: string
+  lastError: string
+}
+export const createPlan = (data: UrgentPlanSave) =>
+  request.post<number>({ url: `${url}/plan/create`, data })
+type UrgentPlanResponse = Omit<UrgentPlan, 'startDate' | 'endDate' | 'nextDate' | 'dailyTime'> & {
+  startDate: string | number[]
+  endDate: string | number[]
+  nextDate: string | number[]
+  dailyTime: string | number[]
+}
+const planDate = (value: string | number[]) =>
+  Array.isArray(value)
+    ? value.map((part, index) => String(part).padStart(index === 0 ? 4 : 2, '0')).join('-')
+    : value
+const planTime = (value: string | number[]) => {
+  const parts = Array.isArray(value) ? value : value.split(':')
+  return [0, 1, 2].map((index) => String(parts[index] ?? 0).padStart(2, '0')).join(':')
+}
+export const getPlanPage = async (params: PageParam) => {
+  const res = await request.get<{ list: UrgentPlanResponse[]; total: number }>({
+    url: `${url}/plan/page`,
+    params
+  })
+  return {
+    ...res,
+    list: res.list.map(
+      (row): UrgentPlan => ({
+        ...row,
+        startDate: planDate(row.startDate),
+        endDate: planDate(row.endDate),
+        nextDate: planDate(row.nextDate),
+        dailyTime: planTime(row.dailyTime)
+      })
+    )
+  }
+}
+export const actPlan = (data: {
+  id: number
+  revision: number
+  action: 'PAUSE' | 'RESUME' | 'END'
+}) => request.put({ url: `${url}/plan/action`, data })
+export const updatePlanSchedule = (data: {
+  id: number
+  revision: number
+  endDate: string
+  dailyTime: string
+  weekdays: number[]
+}) => request.put({ url: `${url}/plan/schedule`, data })
