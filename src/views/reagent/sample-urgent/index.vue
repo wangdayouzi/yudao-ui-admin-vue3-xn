@@ -1,55 +1,71 @@
 <template>
   <ContentWrap>
-    <el-radio-group v-model="query.view" @change="search" class="mb-16px">
-      <el-radio-button value="ALL">全部需求</el-radio-button>
-      <el-radio-button value="MINE">我的预约</el-radio-button>
-      <el-radio-button value="TODAY">今日到期</el-radio-button>
-    </el-radio-group>
-    <el-form :inline="true" @submit.prevent="search">
-      <el-form-item label="关键词"
-        ><el-input
-          v-model="query.keyword"
-          clearable
-          placeholder="临床方案、BAS、检测项或备注"
-          @keydown.enter="searchOnEnter"
-          @clear="search"
-      /></el-form-item>
-      <el-form-item label="预约人"
-        ><el-input
-          v-model="query.contacts"
-          clearable
-          class="!w-150px"
-          @keydown.enter="searchOnEnter"
-          @clear="search"
-      /></el-form-item>
-      <el-form-item label="入库地点">
-        <el-select v-model="query.inboundSite" class="!w-140px" @change="search">
-          <el-option label="全部" value="ALL" />
-          <el-option label="宁波" value="NINGBO" />
-          <el-option label="上海" value="SHANGHAI" />
-        </el-select>
-      </el-form-item>
-      <el-form-item label="状态">
-        <el-select v-model="query.status" clearable class="!w-140px" @change="search">
-          <el-option v-for="(s, i) in statuses" :key="i" :label="s" :value="i" />
-        </el-select>
-      </el-form-item>
-      <el-form-item label="逾期情况">
-        <el-select
-          :model-value="query.view === 'OVERDUE' ? 'OVERDUE' : ''"
-          clearable
-          placeholder="全部"
-          class="!w-140px"
-          @change="changeOverdueFilter"
+    <el-form :inline="true" class="urgent-search" @submit.prevent="search">
+      <div class="urgent-search-top">
+        <el-radio-group v-model="query.view" @change="search">
+          <el-radio-button value="ALL">全部需求</el-radio-button>
+          <el-radio-button value="MINE">我的预约</el-radio-button>
+          <el-radio-button value="TODAY">今日到期</el-radio-button>
+        </el-radio-group>
+        <el-form-item label="预约入库时间">
+          <el-date-picker
+            v-model="query.deadline"
+            type="datetimerange"
+            value-format="YYYY-MM-DD HH:mm:ss"
+            start-placeholder="开始时间"
+            end-placeholder="结束时间"
+            :shortcuts="deadlineFilterShortcuts"
+            :default-time="[new Date(2000, 0, 1, 0, 0, 0), new Date(2000, 0, 1, 23, 59, 59)]"
+            @change="search"
+          />
+        </el-form-item>
+      </div>
+      <div class="urgent-search-fields">
+        <el-form-item label="关键词"
+          ><el-input
+            v-model="query.keyword"
+            clearable
+            placeholder="临床方案、BAS、检测项或备注"
+            @keydown.enter="searchOnEnter"
+            @clear="search"
+        /></el-form-item>
+        <el-form-item label="预约人"
+          ><el-input
+            v-model="query.contacts"
+            clearable
+            class="!w-150px"
+            @keydown.enter="searchOnEnter"
+            @clear="search"
+        /></el-form-item>
+        <el-form-item label="入库地点">
+          <el-select v-model="query.inboundSite" class="!w-140px" @change="search">
+            <el-option label="全部" value="ALL" />
+            <el-option label="宁波" value="NINGBO" />
+            <el-option label="上海" value="SHANGHAI" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="状态">
+          <el-select v-model="query.status" clearable class="!w-140px" @change="search">
+            <el-option v-for="(s, i) in statuses" :key="i" :label="s" :value="i" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="逾期情况">
+          <el-select
+            :model-value="query.view === 'OVERDUE' ? 'OVERDUE' : ''"
+            clearable
+            placeholder="全部"
+            class="!w-140px"
+            @change="changeOverdueFilter"
+          >
+            <el-option label="全部" value="" />
+            <el-option label="已逾期" value="OVERDUE" />
+          </el-select>
+        </el-form-item>
+        <el-form-item
+          ><el-button type="primary" native-type="submit" :loading="loading">搜索</el-button
+          ><el-button @click="reset">重置</el-button></el-form-item
         >
-          <el-option label="全部" value="" />
-          <el-option label="已逾期" value="OVERDUE" />
-        </el-select>
-      </el-form-item>
-      <el-form-item
-        ><el-button type="primary" native-type="submit" :loading="loading">搜索</el-button
-        ><el-button @click="reset">重置</el-button></el-form-item
-      >
+      </div>
     </el-form>
   </ContentWrap>
   <ContentWrap>
@@ -65,11 +81,13 @@
       >
     </div>
     <el-table
+      ref="tableRef"
       v-loading="loading"
       :data="list"
       :row-class-name="rowClass"
       row-key="id"
       @row-dblclick="(row) => openDetail(row.id)"
+      @sort-change="changeSort"
     >
       <template #empty
         ><el-empty :description="listError ? '加载失败，请重试' : '暂无加急需求'" :image-size="70"
@@ -90,7 +108,7 @@
       <el-table-column label="入库地点" width="100">
         <template #default="{ row }">{{ siteName(row.inboundSite) }}</template>
       </el-table-column>
-      <el-table-column label="预约入库时间" width="185">
+      <el-table-column label="预约入库时间" prop="deadline" sortable="custom" width="185">
         <template #default="{ row }"
           ><div :class="overdue(row) ? 'text-red-500' : ''">{{ fmt(row.deadline) }}</div
           ><el-tag v-if="overdue(row)" type="danger" size="small">已逾期</el-tag></template
@@ -115,12 +133,13 @@
       >
       <el-table-column label="处理人" prop="handlerName" width="100" />
       <el-table-column label="提交人" prop="requesterName" width="100" />
+      <el-table-column label="登记时间" prop="createTime" sortable="custom" width="185">
+        <template #default="{ row }">{{ fmt(row.createTime) }}</template>
+      </el-table-column>
       <el-table-column label="操作" fixed="right" width="210"
         ><template #default="{ row }">
           <el-button link type="primary" @click="openDetail(row.id)">{{
-            row.status < 4
-              ? '处理'
-              : '详情'
+            row.status < 4 ? '处理' : '详情'
           }}</el-button>
           <el-button v-if="canEdit(row)" link type="primary" @click="openEdit(row.id)"
             >修改</el-button
@@ -450,10 +469,7 @@
                   maxlength="4000"
                   placeholder="请输入尚未完成的样品范围"
               /></el-form-item>
-              <el-form-item
-                v-if="progress.status === 3"
-                label="实际入库时间"
-                prop="completedTime"
+              <el-form-item v-if="progress.status === 3" label="实际入库时间" prop="completedTime"
                 ><el-date-picker
                   v-model="progress.completedTime"
                   type="datetime"
@@ -530,7 +546,7 @@
 <script setup lang="ts">
 import dayjs from 'dayjs'
 import { ElMessageBox } from 'element-plus'
-import type { FormInstance, FormRules } from 'element-plus'
+import type { FormInstance, FormRules, TableInstance } from 'element-plus'
 import * as Api from '@/api/reagent/sampleUrgent'
 import * as BasicDataApi from '@/api/reagent/basicData'
 import type { UrgentRecord, UrgentSave, UrgentLog, UrgentAction } from '@/api/reagent/sampleUrgent'
@@ -557,6 +573,50 @@ const exceptionLabel = (value: string) => exceptions.find((e) => e.value === val
 const statusType = (s: number): 'info' | 'primary' | 'warning' | 'success' =>
   (['info', 'primary', 'warning', 'success', 'info'] as const)[s] || 'info'
 const fmt = (value?: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm') : '—')
+const deadlineFilterShortcuts = [
+  {
+    text: '今天',
+    value: () => {
+      const today = dayjs()
+      return [today.startOf('day').toDate(), today.endOf('day').toDate()]
+    }
+  },
+  {
+    text: '2天内',
+    value: () => {
+      const today = dayjs()
+      return [today.subtract(1, 'day').startOf('day').toDate(), today.endOf('day').toDate()]
+    }
+  },
+  {
+    text: '3天内',
+    value: () => {
+      const today = dayjs()
+      return [today.subtract(2, 'day').startOf('day').toDate(), today.endOf('day').toDate()]
+    }
+  },
+  {
+    text: '5天内',
+    value: () => {
+      const today = dayjs()
+      return [today.subtract(4, 'day').startOf('day').toDate(), today.endOf('day').toDate()]
+    }
+  },
+  {
+    text: '一周内',
+    value: () => {
+      const today = dayjs()
+      return [today.subtract(6, 'day').startOf('day').toDate(), today.endOf('day').toDate()]
+    }
+  },
+  {
+    text: '本月',
+    value: () => {
+      const today = dayjs()
+      return [today.startOf('month').toDate(), today.endOf('month').toDate()]
+    }
+  }
+]
 const now = ref(dayjs().valueOf())
 let timer: ReturnType<typeof setInterval> | undefined
 const siteName = (site: UrgentSave['inboundSite']) => {
@@ -606,8 +666,12 @@ const defaults = () => ({
   contacts: '',
   inboundSite: 'ALL',
   status: undefined as number | undefined,
-  view: 'ALL'
+  view: 'ALL',
+  deadline: [] as string[] | null,
+  sortField: undefined as 'deadline' | 'createTime' | undefined,
+  sortOrder: undefined as 'asc' | 'desc' | undefined
 })
+const tableRef = ref<TableInstance>()
 const query = reactive(defaults())
 const appliedQuery = ref(defaults())
 const loading = ref(false)
@@ -641,6 +705,11 @@ const search = () => {
   query.pageNo = 1
   getList()
 }
+const changeSort = ({ prop, order }: { prop: string; order: string | null }) => {
+  query.sortField = order && (prop === 'deadline' || prop === 'createTime') ? prop : undefined
+  query.sortOrder = query.sortField ? (order === 'ascending' ? 'asc' : 'desc') : undefined
+  search()
+}
 const changeOverdueFilter = (value: string) => {
   if (value === 'OVERDUE') query.view = 'OVERDUE'
   else if (query.view === 'OVERDUE') query.view = 'ALL'
@@ -653,6 +722,7 @@ const searchOnEnter = (event: KeyboardEvent) => {
 }
 const reset = () => {
   Object.assign(query, defaults())
+  tableRef.value?.clearSort()
   getList()
 }
 const editVisible = ref(false)
@@ -1159,7 +1229,7 @@ const exportCsv = async () => {
       '实际入库时间',
       '提交人',
       '处理人',
-      '提交时间'
+      '登记时间'
     ]
     const cell = (v: unknown) => {
       let s = String(v ?? '')
@@ -1241,19 +1311,38 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.urgent-search-top,
+.urgent-search-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 24px;
+  align-items: center;
+}
+
+.urgent-search-top {
+  margin-bottom: 16px;
+}
+
+.urgent-search :deep(.el-form-item) {
+  margin: 0;
+}
+
 .log-content {
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
   margin-top: 8px;
   color: var(--el-text-color-regular);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
+
 :deep(.urgent-overdue) {
   --el-table-tr-bg-color: var(--el-color-danger-light-9);
 }
+
 :deep(.el-descriptions__content) {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+
 .drawer-footer {
   display: flex;
   justify-content: space-between;
@@ -1261,25 +1350,29 @@ onUnmounted(() => {
   gap: 12px;
   flex-wrap: wrap;
 }
+
 .detail-summary {
   display: flex;
-  flex-wrap: wrap;
-  gap: 10px 24px;
   padding: 14px 16px;
   margin-bottom: 16px;
+  color: var(--el-text-color-regular);
   background: var(--el-fill-color-light);
   border-radius: 6px;
-  color: var(--el-text-color-regular);
+  flex-wrap: wrap;
+  gap: 10px 24px;
 }
+
 .detail-summary > div {
   width: 100%;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+
 :deep(.el-drawer__footer) {
-  border-top: 1px solid var(--el-border-color-lighter);
   padding: 14px 20px;
+  border-top: 1px solid var(--el-border-color-lighter);
 }
+
 :deep(.el-date-editor.el-input) {
   max-width: 100%;
 }
